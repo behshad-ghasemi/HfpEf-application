@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# Data / Model files
+*.csv
+*.xlsx
+*.xls
+data/
+*.db
+*.pkl
+*.h5
+*.joblib
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets
+config.yaml
+.streamlit/secrets.toml
