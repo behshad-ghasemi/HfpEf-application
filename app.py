@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
-from yaml.loader import SafeLoader
 import pandas as pd
 import numpy as np
 import pickle
@@ -48,23 +47,23 @@ st.set_page_config(
 )
 
 # ==========================================
-#      3) Authentication (credentials stored in private repo)
+#      3) Authentication — FIXED VERSION
 # ==========================================
 
-with open(".streamlit/secrets.toml") as f:
-    config = yaml.safe_load(f)
+# config is loaded directly from Streamlit Secrets
+config = st.secrets["auth"]
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
+    config["credentials"],
+    config["cookie"]["name"],
+    config["cookie"]["key"],
+    config["cookie"]["expiry_days"]
 )
 
 try:
     authenticator.login()
 except:
-    authenticator.login('main')
+    authenticator.login("main")
 
 if st.session_state.get("authentication_status") == False:
     st.error("❌ Username or password incorrect.")
@@ -74,7 +73,7 @@ if st.session_state.get("authentication_status") is None:
     st.warning("🔐 Please enter your username and password.")
     st.stop()
 
-name = st.session_state['name']
+name = st.session_state["name"]
 
 # ==========================================
 #      4) HEADER + LOGO
@@ -98,6 +97,7 @@ with col3:
     authenticator.logout("Logout", "main")
 
 st.markdown("---")
+
 
 # ==========================================
 #      5) SIDEBAR MODEL DETAILS
