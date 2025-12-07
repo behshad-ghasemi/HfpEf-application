@@ -9,19 +9,37 @@ from PIL import Image
 import requests
 import io
 
-# ================== Load private model from GitHub using secret token ==================
+# ==========================================
+#      1) Load model securely from PRIVATE GitHub repo
+# ==========================================
 
+# URL of the private repo file
 url = "https://raw.githubusercontent.com/behshad-ghasemi/Hfpef-application-secrets/main/inference_objects.pkl"
 
-headers = {
-    "Accept": "application/vnd.github+json",
-    "Authorization": f"token {st.secrets['github']['token']}"
-}
+# Token stored in Streamlit Cloud → Secrets Manager
+headers = {"Authorization": f"Bearer {st.secrets['github']['token']}"}
 
 response = requests.get(url, headers=headers)
-model = pickle.load(io.BytesIO(response.content))
 
-# ================== Streamlit Page Config ==================
+if response.status_code != 200:
+    st.error("❌ Could not download model file from private GitHub repository.")
+    st.stop()
+
+model_objects = pickle.load(io.BytesIO(response.content))
+
+# Preloaded inference elements
+preprocessor = model_objects['preprocessor']
+multi_reg = model_objects['multi_reg']
+model_hf = model_objects['model_hf']
+bio_features_scaled = model_objects['bio_features_scaled']
+mediator_features_scaled = model_objects['mediator_features_scaled']
+NUM_FEATURES = model_objects['NUM_FEATURES']
+causal_ranges = model_objects['causal_ranges']
+
+# ==========================================
+#      2) Streamlit UI settings
+# ==========================================
+
 st.set_page_config(
     page_title="HFpEF Prediction System",
     page_icon="🏥",
@@ -29,222 +47,196 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================== FIXED: Load secrets correctly ==================
-config = st.secrets    # <---- این مهم ترین اصلاح است
+# ==========================================
+#      3) Authentication (credentials stored in private repo)
+# ==========================================
 
-# ================== Authentication ==================
+with open(".streamlit/secrets.toml") as f:
+    config = yaml.safe_load(f)
+
 authenticator = stauth.Authenticate(
-    credentials=config['credentials'],
-    cookie_name=config['cookie']['name'],
-    key=config['cookie']['key'],
-    expiry_days=config['cookie']['expiry_days']
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
 )
 
 try:
     authenticator.login()
-except TypeError:
+except:
     authenticator.login('main')
 
 if st.session_state.get("authentication_status") == False:
-    st.error('username or password is not correct!')
+    st.error("❌ Username or password incorrect.")
     st.stop()
 
-if st.session_state.get("authentication_status") == None:
-    st.warning('Insert your user-name and password, please.')
+if st.session_state.get("authentication_status") is None:
+    st.warning("🔐 Please enter your username and password.")
     st.stop()
 
+name = st.session_state['name']
 
-name = st.session_state.get("name")
-authentication_status = st.session_state.get("authentication_status")
-username = st.session_state.get("username")
+# ==========================================
+#      4) HEADER + LOGO
+# ==========================================
 
-# ================== Main App ==================
-if authentication_status:
+col1, col2, col3 = st.columns([1, 3, 1])
 
-    col1, col2, col3 = st.columns([1, 3, 1])
+with col1:
+    try:
+        st.image("logo.png", width=150)
+    except:
+        st.write("🏥")
 
-    with col1:
-        try:
-            logo = Image.open("logo.png")
-            st.image(logo, width=150)
-        except:
-            st.write("🏥")
+with col2:
+    st.title("🏥 HFpEF Prediction System")
+    st.markdown("**Heart Failure with Preserved Ejection Fraction Risk Assessment**")
+    st.markdown("*Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*")
 
-    with col2:
-        st.title("🏥 HFpEF Prediction System")
-        st.markdown("**Heart Failure with Preserved Ejection Fraction Risk Assessment**")
-        st.markdown("*This application is developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*")
+with col3:
+    st.write(f"👤 **{name}**")
+    authenticator.logout("Logout", "main")
 
-    with col3:
-        st.write(f"👤 **{name}**")
-        authenticator.logout('Logout', 'main')
+st.markdown("---")
+
+# ==========================================
+#      5) SIDEBAR MODEL DETAILS
+# ==========================================
+
+with st.sidebar:
+    st.header("📊 Model Information")
+    st.metric("Stage 1 Model", model_objects['best_stage1_model_name'])
+    st.metric("Stage 1 R²", f"{model_objects['best_stage1_r2']:.3f}")
+    st.metric("Stage 2 Model", model_objects['best_stage2_model_name'])
+    st.metric("Stage 2 AUC", f"{model_objects['best_stage2_auc']:.3f}")
 
     st.markdown("---")
+    st.info("The model estimates HFpEF risk using biomarkers.")
 
-    # ---------- Load models ----------
-    @st.cache_resource
-    def load_models():
-        try:
-            with open('inference_objects.pkl', 'rb') as f:
-                objects = pickle.load(f)
-            return objects
-        except FileNotFoundError:
-            st.error('Not founded')
-            st.stop()
+# ==========================================
+#      6) BIOMARKER FORM INPUT
+# ==========================================
 
-    inference_objects = load_models()
+st.header("🔬 Biomarker Information")
 
-    preprocessor = inference_objects['preprocessor']
-    multi_reg = inference_objects['multi_reg']
-    model_hf = inference_objects['model_hf']
-    bio_features_scaled = inference_objects['bio_features_scaled']
-    mediator_features_scaled = inference_objects['mediator_features_scaled']
-    NUM_FEATURES = inference_objects['NUM_FEATURES']
-    causal_ranges = inference_objects['causal_ranges']
+bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
 
-    # ---------- Sidebar ----------
-    with st.sidebar:
-        st.header("📊 Model Information")
-        st.metric("Stage 1 Model", inference_objects['best_stage1_model_name'])
-        st.metric("Stage 1 R²", f"{inference_objects['best_stage1_r2']:.3f}")
-        st.metric("Stage 2 Model", inference_objects['best_stage2_model_name'])
-        st.metric("Stage 2 AUC", f"{inference_objects['best_stage2_auc']:.3f}")
-        st.markdown("---")
-        st.info('This model finds the probability of HFpEF based on Biomarkers')
+with st.form("biomarker_form"):
+    st.markdown("Enter patient biomarker values.")
 
-    # ---------- Biomarker Form ----------
-    st.header('"🔬Biomarker information:"')
+    cols = st.columns(3)
+    user_data = {}
 
-    bio_features_original = [f.replace('num__', '') for f in bio_features_scaled]
-
-    with st.form("biomarker_form"):
-        st.markdown('Insert biomarker values of your patient, please.')
-
-        cols = st.columns(3)
-        user_data = {}
-
-        for idx, biomarker in enumerate(bio_features_original):
-            col_idx = idx % 3
-            with cols[col_idx]:
-                value = st.number_input(
-                    f"**{biomarker}**",
-                    value=None,
-                    format="%.2f",
-                    help=f"Insert {biomarker} value",
-                    key=f"bio_{idx}"
-                )
-                user_data[biomarker] = value if value is not None else np.nan
-
-        submitted = st.form_submit_button("🔍 Forcasting HFpEF ", use_container_width=True)
-
-    # ---------- Prediction ----------
-    if submitted:
-        with st.spinner("Calculating..."):
-
-            bio_df_input = pd.DataFrame([user_data], columns=bio_features_original)
-
-            full_input = pd.DataFrame(columns=NUM_FEATURES)
-            for b_orig in bio_features_original:
-                if b_orig in NUM_FEATURES:
-                    full_input[b_orig] = [user_data[b_orig]]
-
-            for col in NUM_FEATURES:
-                if col not in full_input.columns:
-                    full_input[col] = np.nan
-
-            bio_scaled = preprocessor.transform(full_input)
-            bio_scaled_df = pd.DataFrame(bio_scaled, columns=preprocessor.get_feature_names_out())
-            bio_input_scaled = bio_scaled_df[bio_features_scaled]
-
-            scaled_mediators = multi_reg.predict(bio_input_scaled)
-            scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled)
-
-            num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
-            full_scaled = np.zeros((1, len(NUM_FEATURES)))
-            mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
-
-            for i, feature in enumerate(NUM_FEATURES):
-                if feature in mediator_raw_names:
-                    idx = mediator_raw_names.index(feature)
-                    full_scaled[0, i] = scaled_mediators[0, idx]
-
-            actual_values = num_scaler.inverse_transform(full_scaled)
-            mediator_actual = {}
-
-            for i, feature in enumerate(NUM_FEATURES):
-                if feature in mediator_raw_names:
-                    mediator_actual[feature] = actual_values[0, i]
-
-            actual_mediators_df = pd.DataFrame([mediator_actual])
-
-            hf_proba = model_hf.predict_proba(scaled_mediators_df.values)
-            p_hf = float(hf_proba[0, 1])
-
-            st.markdown("---")
-            st.header("📊  Result: ")
-
-            col1, col2, col3 = st.columns([2, 1, 2])
-
-            with col2:
-                if p_hf >= 0.7:
-                    st.error(f"### 🔴 {p_hf:.1%}")
-                    st.error("**High Risk**")
-                elif p_hf >= 0.5:
-                    st.warning(f"### 🟠 {p_hf:.1%}")
-                    st.warning("**Medium Risk**")
-                else:
-                    st.success(f"### 🟢 {p_hf:.1%}")
-                    st.success("**Low Risk**")
-
-            st.markdown("### 📈 LV mass / E'e avg / LAD forcasting based on biomarkers")
-
-            mediator_df_display = actual_mediators_df.T
-            mediator_df_display.columns = ['Forcasting quantity:']
-            mediator_df_display.index.name = 'Mediator:'
-
-            st.dataframe(
-                mediator_df_display.style.format("{:.2f}"),
-                use_container_width=True
+    for i, biomarker in enumerate(bio_features_original):
+        col = cols[i % 3]
+        with col:
+            value = st.number_input(
+                f"{biomarker}",
+                value=None,
+                format="%.2f",
+                key=f"bio_{i}"
             )
+            user_data[biomarker] = np.nan if value is None else value
 
-            st.markdown("### 💊  recommendation")
+    submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
-            if p_hf >= 0.5:
-                st.warning("""
-                **⚠️ PLEASE :**
-               - Complete assessment 
-               - Cardiologist review needed!
-                """)
+# ==========================================
+#      7) PROCESS INPUT & PREDICT
+# ==========================================
+
+if submitted:
+    with st.spinner("Calculating..."):
+
+        # Create dataframe
+        df_bio = pd.DataFrame([user_data], columns=bio_features_original)
+
+        # Fill structure for preprocessing
+        full_input = pd.DataFrame(columns=NUM_FEATURES)
+        for col in NUM_FEATURES:
+            if col in df_bio.columns:
+                full_input[col] = df_bio[col]
             else:
-                st.success("""
-                **✅ Normal situation**
-                """)
+                full_input[col] = np.nan
 
-            st.markdown("---")
+        # Scale input
+        scaled = preprocessor.transform(full_input)
+        df_scaled = pd.DataFrame(scaled, columns=preprocessor.get_feature_names_out())
+        bio_scaled_input = df_scaled[bio_features_scaled]
 
-            report = f"""
-              HFpEF Probability Report
-            =====================
-            
-            Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
-            User: {name}
-            
-            Probability HFpEF Risk: {p_hf:.1%}
-            Situation: {'High Risk' if p_hf >= 0.7 else 'Medium Risk' if p_hf >= 0.5 else 'Low Risk'}
-            
-            Biomarkers input
-            {bio_df_input.to_string()}
-            
-            Mediator Forcasting values:
-            {actual_mediators_df.to_string()}
-            """
+        # Stage 1 prediction (mediators)
+        predicted_scaled_mediators = multi_reg.predict(bio_scaled_input)
+        df_pred_scaled = pd.DataFrame(predicted_scaled_mediators, columns=mediator_features_scaled)
 
-            st.download_button(
-                label="📥 Download Report",
-                data=report,
-                file_name=f"HFpEF_Report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.txt",
-                mime="text/plain"
-            )
+        # Convert back to actual values
+        num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+        zeros_full = np.zeros((1, len(NUM_FEATURES)))
+
+        med_raw = [m.replace("num__", "") for m in mediator_features_scaled]
+
+        for i, f in enumerate(NUM_FEATURES):
+            if f in med_raw:
+                idx = med_raw.index(f)
+                zeros_full[0, i] = predicted_scaled_mediators[0, idx]
+
+        actual_vals = num_scaler.inverse_transform(zeros_full)
+
+        mediator_actual = {
+            f: actual_vals[0, i] for i, f in enumerate(NUM_FEATURES) if f in med_raw
+        }
+        df_mediators_actual = pd.DataFrame([mediator_actual]).T
+        df_mediators_actual.columns = ["Predicted Value"]
+
+        # Stage 2: HF probability
+        hf_proba = model_hf.predict_proba(df_pred_scaled.values)[0, 1]
+
+        st.markdown("---")
+        st.header("📊 Prediction Result")
+
+        col1, col2, col3 = st.columns([2, 1, 2])
+
+        with col2:
+            if hf_proba >= 0.7:
+                st.error(f"### 🔴 {hf_proba:.1%}\n**High Risk**")
+            elif hf_proba >= 0.5:
+                st.warning(f"### 🟠 {hf_proba:.1%}\n**Medium Risk**")
+            else:
+                st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
+
+        st.markdown("### 🧪 Predicted Mediator Values")
+        st.dataframe(df_mediators_actual, use_container_width=True)
+
+        st.markdown("### 💊 Recommendation")
+
+        if hf_proba >= 0.5:
+            st.warning("⚠️ Additional cardiology review recommended.")
+        else:
+            st.success("Normal condition.")
+
+        # Download report
+        st.markdown("---")
+        report = f"""
+HFpEF Probability Report
+=========================
+
+Date: {pd.Timestamp.now()}
+
+Probability: {hf_proba:.1%}
+Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
+
+Biomarker input:
+{df_bio.to_string()}
+
+Predicted mediators:
+{df_mediators_actual.to_string()}
+"""
+
+        st.download_button(
+            "📥 Download Report",
+            report,
+            file_name="HFpEF_Report.txt",
+            mime="text/plain"
+        )
+
 
 # ================== تنظیمات صفحه ==================
 st.set_page_config(
