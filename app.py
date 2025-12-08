@@ -50,14 +50,17 @@ st.set_page_config(
 #      3) Authentication — FIXED VERSION
 # ==========================================
 
-# config is loaded directly from Streamlit Secrets
-config = st.secrets["auth"]
+config = {
+    "credentials": st.secrets["credentials"],
+    "cookie": st.secrets["cookie"]
+}
+
 
 authenticator = stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"]
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
 )
 
 try:
