@@ -1,5 +1,8 @@
-streamlit==1.28.0
-streamlit-authenticator==0.3.2
+streamlit
+streamlit-authenticator==0.2.1
+pyyaml
+bcrypt
+
 pandas==2.1.4
 numpy==1.26.3
 scikit-learn==1.4.0
