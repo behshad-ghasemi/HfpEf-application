@@ -1,5 +1,5 @@
 streamlit==1.24.0
-streamlit-authenticator==0.11.0
+streamlit_authenticator
 Pillow
 PyYAML
 pandas
