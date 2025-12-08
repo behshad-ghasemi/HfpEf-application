@@ -1,12 +1,14 @@
-import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
+import copy
 import pandas as pd
 import numpy as np
 import pickle
 from PIL import Image
 import requests
 import io
+import streamlit as st
+
 
 # ==========================================
 #      1) Load model securely from PRIVATE GitHub repo
@@ -50,17 +52,19 @@ st.set_page_config(
 #      3) Authentication — FIXED VERSION
 # ==========================================
 
-config = {
-    "credentials": st.secrets["credentials"],
-    "cookie": st.secrets["cookie"]
+config = copy.deepcopy(st.secrets)
+
+credentials = {
+    "usernames": dict(config["credentials"]["usernames"])
 }
 
+cookie = dict(config["cookie"])
 
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
+    credentials,
+    cookie["name"],
+    cookie["key"],
+    cookie["expiry_days"]
 )
 
 try:
