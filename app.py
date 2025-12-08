@@ -52,7 +52,7 @@ st.set_page_config(
 #      3) Authentication — FIXED VERSION
 # ==========================================
 
-config = copy.deepcopy(st.secrets)
+config = st.secrets["auth"]
 
 credentials = {
     "usernames": dict(config["credentials"]["usernames"])
