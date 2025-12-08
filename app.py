@@ -10,14 +10,7 @@ import io
 import streamlit as st
 
 
-# ==========================================
-#      1) Load model securely from PRIVATE GitHub repo
-# ==========================================
-
-# URL of the private repo file
 url = "https://raw.githubusercontent.com/behshad-ghasemi/Hfpef-application-secrets/main/inference_objects.pkl"
-
-# Token stored in Streamlit Cloud → Secrets Manager
 headers = {"Authorization": f"Bearer {st.secrets['github']['token']}"}
 
 response = requests.get(url, headers=headers)
@@ -27,8 +20,6 @@ if response.status_code != 200:
     st.stop()
 
 model_objects = pickle.load(io.BytesIO(response.content))
-
-# Preloaded inference elements
 preprocessor = model_objects['preprocessor']
 multi_reg = model_objects['multi_reg']
 model_hf = model_objects['model_hf']
@@ -37,9 +28,6 @@ mediator_features_scaled = model_objects['mediator_features_scaled']
 NUM_FEATURES = model_objects['NUM_FEATURES']
 causal_ranges = model_objects['causal_ranges']
 
-# ==========================================
-#      2) Streamlit UI settings
-# ==========================================
 
 st.set_page_config(
     page_title="HFpEF Prediction System",
@@ -48,9 +36,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==========================================
-#      3) Authentication — FIXED VERSION
-# ==========================================
 
 config = st.secrets["auth"]
 
@@ -82,9 +67,6 @@ if st.session_state.get("authentication_status") is None:
 
 name = st.session_state["name"]
 
-# ==========================================
-#      4) HEADER + LOGO
-# ==========================================
 
 col1, col2, col3 = st.columns([1, 3, 1])
 
@@ -106,9 +88,7 @@ with col3:
 st.markdown("---")
 
 
-# ==========================================
-#      5) SIDEBAR MODEL DETAILS
-# ==========================================
+
 
 with st.sidebar:
     st.header("📊 Model Information")
@@ -120,9 +100,7 @@ with st.sidebar:
     st.markdown("---")
     st.info("The model estimates HFpEF risk using biomarkers.")
 
-# ==========================================
-#      6) BIOMARKER FORM INPUT
-# ==========================================
+
 
 st.header("🔬 Biomarker Information")
 
@@ -147,9 +125,7 @@ with st.form("biomarker_form"):
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
-# ==========================================
-#      7) PROCESS INPUT & PREDICT
-# ==========================================
+
 
 if submitted:
     with st.spinner("Calculating..."):
@@ -245,7 +221,7 @@ Predicted mediators:
         )
 
 
-# ================== تنظیمات صفحه ==================
+
 st.set_page_config(
     page_title="HFpEF Prediction System",
     page_icon="🏥",
@@ -253,7 +229,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ================== استایل CSS پیشرفته ==================
+
 st.markdown("""
 <style>
     /* پس‌زمینه گرادیانت حرفه‌ای */
