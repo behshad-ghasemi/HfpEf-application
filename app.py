@@ -206,9 +206,7 @@ if submitted:
         st.error("⚠️ Biomarker values have too little variation. Please enter realistic patient data.")
         st.stop()
 
-
-    else:
-        st.success("All inputs within normal ranges ✅")
+    st.success("All inputs within normal ranges ✅")
 
     with st.spinner("Calculating..."):
        
