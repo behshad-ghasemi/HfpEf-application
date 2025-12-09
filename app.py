@@ -159,6 +159,7 @@ bio_stats = {
     "mir125": {"mean": 1.2, "std": 0.4}
 }
 
+
 with st.form("biomarker_form"):
     st.markdown("Enter patient biomarker values (only zero or positive numbers).")
 
@@ -169,6 +170,7 @@ with st.form("biomarker_form"):
     for i, biomarker in enumerate(bio_features_original):
         col = cols[i % 3]
         with col:
+            # ورودی actual کاربر
             value = st.number_input(
                 f"{biomarker} ({bio_units.get(biomarker, '')})",
                 value=0.0,
@@ -179,26 +181,27 @@ with st.form("biomarker_form"):
             )
             user_data[biomarker] = value
 
+            # بررسی مقدار ورودی کاربر با mean/std واقعی
             mean = bio_stats[biomarker]["mean"]
             std = bio_stats[biomarker]["std"]
             if value < mean - 2*std or value > mean + 2*std:
-                alerts.append(f"⚠️ {biomarker} value ({value}) is outside the range , Insert the correct value please!")
+                alerts.append(f"⚠️ {biomarker} value ({value}) is outside the normal range ({mean-2*std:.2f} - {mean+2*std:.2f}). Please insert a correct value!")
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
 if submitted:
+    # اگر مقادیر خارج از محدوده باشند
     if alerts:
         for alert in alerts:
             st.error(alert)
-        st.stop() 
+        st.stop()  # جلوگیری از ادامه محاسبه
     else:
         st.success("All inputs within normal ranges ✅")
-    with st.spinner("Calculating..."):
 
-        
+    with st.spinner("Calculating..."):
+        # تبدیل ورودی به DataFrame و ادامه محاسبات مدل
         df_bio = pd.DataFrame([user_data], columns=bio_features_original)
 
-        
         full_input = pd.DataFrame(columns=NUM_FEATURES)
         for col in NUM_FEATURES:
             if col in df_bio.columns:
@@ -206,7 +209,6 @@ if submitted:
             else:
                 full_input[col] = np.nan
 
-        
         scaled = preprocessor.transform(full_input)
         df_scaled = pd.DataFrame(scaled, columns=preprocessor.get_feature_names_out())
         bio_scaled_input = df_scaled[bio_features_scaled]
@@ -215,7 +217,7 @@ if submitted:
         predicted_scaled_mediators = multi_reg.predict(bio_scaled_input)
         df_pred_scaled = pd.DataFrame(predicted_scaled_mediators, columns=mediator_features_scaled)
 
-        # Convert back to actual values
+        # تبدیل mediators به actual
         num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
         zeros_full = np.zeros((1, len(NUM_FEATURES)))
 
@@ -241,7 +243,6 @@ if submitted:
         st.header("📊 Prediction Result")
 
         col1, col2, col3 = st.columns([2, 1, 2])
-
         with col2:
             if hf_proba >= 0.7:
                 st.error(f"### 🔴 {hf_proba:.1%}\n**High Risk**")
@@ -254,13 +255,12 @@ if submitted:
         st.dataframe(df_mediators_actual, use_container_width=True)
 
         st.markdown("### 💊 Recommendation")
-
         if hf_proba >= 0.5:
             st.warning("⚠️ Additional cardiology review recommended.")
         else:
             st.success("Normal condition.")
 
-        # Download report
+        # دانلود گزارش
         st.markdown("---")
         report = f"""
 HFpEF Probability Report
@@ -277,13 +277,19 @@ Biomarker input:
 Predicted mediators:
 {df_mediators_actual.to_string()}
 """
-
         st.download_button(
             "📥 Download Report",
             report,
             file_name="HFpEF_Report.txt",
             mime="text/plain"
         )
+
+
+        # Download report
+        st.markdown("---")
+        report = f"""
+HFpEF Probability Report
+========================
 
 
 
