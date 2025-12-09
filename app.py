@@ -249,7 +249,66 @@ if submitted:
 
     st.success("All inputs within normal ranges ✅")
 
-        
+    with st.spinner("Calculating..."):
+        # (rest of your code unchanged)
+        full_input = pd.DataFrame(columns=NUM_FEATURES)
+        for col in NUM_FEATURES:
+            if col in df_bio.columns:
+                full_input[col] = df_bio[col]
+            else:
+                full_input[col] = np.nan
+
+        scaled = preprocessor.transform(full_input)
+        df_scaled = pd.DataFrame(scaled, columns=preprocessor.get_feature_names_out())
+        bio_scaled_input = df_scaled[bio_features_scaled]
+
+        # Stage 1 prediction (mediators)
+        predicted_scaled_mediators = multi_reg.predict(bio_scaled_input)
+        df_pred_scaled = pd.DataFrame(predicted_scaled_mediators, columns=mediator_features_scaled)
+
+        # تبدیل mediators به actual
+        num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+        zeros_full = np.zeros((1, len(NUM_FEATURES)))
+
+        med_raw = [m.replace("num__", "") for m in mediator_features_scaled]
+
+        for i, f in enumerate(NUM_FEATURES):
+            if f in med_raw:
+                idx = med_raw.index(f)
+                zeros_full[0, i] = predicted_scaled_mediators[0, idx]
+
+        actual_vals = num_scaler.inverse_transform(zeros_full)
+
+        mediator_actual = {
+            f: actual_vals[0, i] for i, f in enumerate(NUM_FEATURES) if f in med_raw
+        }
+        df_mediators_actual = pd.DataFrame([mediator_actual]).T
+        df_mediators_actual.columns = ["Predicted Value"]
+
+        # Stage 2: HF probability
+        hf_proba = model_hf.predict_proba(df_pred_scaled.values)[0, 1]
+
+        st.markdown("---")
+        st.header("📊 Prediction Result")
+
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            if hf_proba >= 0.7:
+                st.error(f"### 🔴 {hf_proba:.1%}\n**High Risk**")
+            elif hf_proba >= 0.5:
+                st.warning(f"### 🟠 {hf_proba:.1%}\n**Medium Risk**")
+            else:
+                st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
+
+        st.markdown("### 🧪 Predicted Mediator Values")
+        st.dataframe(df_mediators_actual, use_container_width=True)
+
+        st.markdown("### 💊 Recommendation")
+        if hf_proba >= 0.5:
+            st.warning("⚠️ Additional cardiology review recommended.")
+        else:
+            st.success("Normal condition.")
+
         # دانلود گزارش
         st.markdown("---")
         report = f"""
@@ -273,7 +332,6 @@ Predicted mediators:
             file_name="HFpEF_Report.txt",
             mime="text/plain"
         )
-
 
 
 
