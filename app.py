@@ -237,15 +237,15 @@ if submitted:
     st.success("✅ All inputs within acceptable ranges")
 
     with st.spinner("Calculating..."):
-    
+
         # --- Step 1: ساخت DataFrame با تمام NUM_FEATURES و CAT_FEATURES ---
         X_input_all = pd.DataFrame(columns=NUM_FEATURES + CAT_FEATURES)
-    
+
         # پر کردن bio_features با داده کاربر
         for b_orig in bio_features_original:
             if b_orig in NUM_FEATURES:
                 X_input_all.loc[0, b_orig] = user_data[b_orig]
-    
+
         # پر کردن بقیه NUM_FEATURES و CAT_FEATURES با NaN
         for col in NUM_FEATURES:
             if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
@@ -253,49 +253,51 @@ if submitted:
         for col in CAT_FEATURES:
             if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
                 X_input_all.loc[0, col] = np.nan
-    
+
+        df_bio_input = X_input_all.copy()  # رفع NameError
+
         # --- Step 2: Transform ---
-        X_scaled = preprocessor.transform(X_input_all)
+        X_scaled = preprocessor.transform(df_bio_input)
         X_scaled_df = pd.DataFrame(X_scaled, columns=preprocessor.get_feature_names_out())
-    
+
         # --- Step 3: استخراج bio_features_scaled ---
         X_bio_scaled = X_scaled_df[bio_features_scaled].copy()
-    
+
         # --- Step 4: پیش‌بینی mediators ---
         mediators_pred_scaled = multi_reg.predict(X_bio_scaled)
         mediators_pred_df = pd.DataFrame(mediators_pred_scaled, columns=mediator_features_scaled)
-    
+
         # --- Step 5: پیش‌بینی HFpEF ---
         hf_proba = model_hf.predict_proba(mediators_pred_df.values)[0, 1]
-    
-        # --- Step 6: محاسبه actual mediator values برای نمایش ---
+
+        # --- Step 6: محاسبه actual mediator values ---
         num_transformer = preprocessor.named_transformers_['num']
         num_scaler = num_transformer.named_steps['scaler']
-    
+
         mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
-    
+
         full_scaled_for_inverse = np.zeros((1, len(NUM_FEATURES)))
         for i, med_scaled_name in enumerate(mediator_features_scaled):
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
                 idx = NUM_FEATURES.index(med_raw_name)
                 full_scaled_for_inverse[0, idx] = mediators_pred_scaled[0, i]
-    
+
         full_actual_values = num_scaler.inverse_transform(full_scaled_for_inverse)
-    
+
         mediator_actual_dict = {}
         for med_scaled_name in mediator_features_scaled:
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
                 idx = NUM_FEATURES.index(med_raw_name)
                 mediator_actual_dict[med_raw_name] = full_actual_values[0, idx]
-    
+
         actual_mediators_df = pd.DataFrame([mediator_actual_dict])
-    
+
         # --- Step 7: نمایش نتایج ---
         st.markdown("---")
         st.header("📊 Prediction Result")
-    
+
         col1, col2, col3 = st.columns([2, 1, 2])
         with col2:
             if hf_proba >= 0.7:
@@ -304,56 +306,56 @@ if submitted:
                 st.warning(f"### 🟠 {hf_proba:.1%}\n**Medium Risk**")
             else:
                 st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
-    
+
         st.markdown("### 🧪 Predicted Mediator Values (ACTUAL)")
         display_df = actual_mediators_df.T
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
 
-    
-        # --- Scaled values برای debugging ---
+        # اضافه کردن scaled values برای debugging
         with st.expander("🔬 Technical Details (Scaled Values Used for Prediction)"):
             scaled_display = mediators_pred_df.T
             scaled_display.columns = ["Scaled Value"]
             st.dataframe(scaled_display, use_container_width=True)
             st.caption("These are the normalized values actually used by the model for prediction.")
-    
+
+        # Recommendation
         st.markdown("### 💊 Recommendation")
         if hf_proba >= 0.5:
             st.warning("⚠️ Additional cardiology review recommended.")
         else:
             st.success("✅ Normal condition - Continue regular monitoring.")
-    
-        # --- Download report ---
+
+        # Download report
         st.markdown("---")
         report = f"""
-    HFpEF Probability Report
-    =========================
-    
-    Date: {pd.Timestamp.now()}
-    Patient: {name}
-    
-    Probability: {hf_proba:.1%}
-    Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
-    
-    Biomarker Input (Original Values):
-    {df_bio_input.to_string()}
-    
-    Predicted Mediators (ACTUAL VALUES):
-    """
+HFpEF Probability Report
+=========================
+
+Date: {pd.Timestamp.now()}
+Patient: {name}
+
+Probability: {hf_proba:.1%}
+Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
+
+Biomarker Input (Original Values):
+{df_bio_input[bio_features_original].to_string(index=False)}
+
+Predicted Mediators (ACTUAL VALUES):
+"""
         for col in actual_mediators_df.columns:
             val = actual_mediators_df[col].values[0]
             report += f"   • {col:50s}: {val:10.2f}\n"
-    
+        
         report += f"""
-    Model Information:
-    - Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
-    - Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
-    
-    Validation Notes:
-    - Adaptive thresholds were applied for biomarkers with high variability
-    - Biomarkers with widened ranges: {', '.join(widened_biomarkers) if widened_biomarkers else 'None'}
-    """
+Model Information:
+- Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
+- Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
+
+Validation Notes:
+- Adaptive thresholds were applied for biomarkers with high variability
+- Biomarkers with widened ranges: {', '.join(widened_biomarkers) if widened_biomarkers else 'None'}
+"""
         st.download_button(
             "📥 Download Report",
             report,
