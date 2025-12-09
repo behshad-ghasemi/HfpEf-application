@@ -187,7 +187,6 @@ with st.form("biomarker_form"):
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
 if submitted:
-    if submitted:
     if alerts:
         for alert in alerts:
             st.warning(alert)
