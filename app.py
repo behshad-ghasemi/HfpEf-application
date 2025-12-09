@@ -139,8 +139,19 @@ st.header("🔬 Biomarker Information")
 
 bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
 
+
+# تعریف واحدها
+bio_units = {
+    "PINK1": "ng/mL",
+    "Galectin3": "ng/mL",
+    "mir-7110": "unitless",
+    "DHEAs": "ng/mL",
+    "SHBG": "nmol/L",
+    "mir125": "unitless"
+}
+
 with st.form("biomarker_form"):
-    st.markdown("Enter patient biomarker values.")
+    st.markdown("Enter patient biomarker values (only zero or positive numbers).")
 
     cols = st.columns(3)
     user_data = {}
@@ -149,16 +160,16 @@ with st.form("biomarker_form"):
         col = cols[i % 3]
         with col:
             value = st.number_input(
-                f"{biomarker}",
-                value=None,
+                f"{biomarker} ({bio_units.get(biomarker, '')})",  # نمایش واحد
+                value=0.0,                                      # مقدار پیش‌فرض
+                min_value=0.0,                                  # فقط صفر و مثبت
+                step=0.01,
                 format="%.2f",
                 key=f"bio_{i}"
             )
-            user_data[biomarker] = np.nan if value is None else value
+            user_data[biomarker] = value
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
-
-
 
 if submitted:
     with st.spinner("Calculating..."):
