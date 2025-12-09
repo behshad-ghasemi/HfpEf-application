@@ -139,7 +139,9 @@ st.header("🔬 Biomarker Information")
 
 bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
 
+st.header("🔬 Biomarker Information")
 
+bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
 
 bio_units = {
     "PINK1": "ng/mL",
@@ -150,15 +152,17 @@ bio_units = {
     "mir125": "unitless"
 }
 
-bio_stats = {
-    "PINK1": {"mean": 5.2, "std": 1.3},
-    "Galectin3": {"mean": 12.5, "std": 3.2},
-    "mir-7110": {"mean": 0.8, "std": 0.2},
-    "DHEAs": {"mean": 3.5, "std": 1.1},
-    "SHBG": {"mean": 50, "std": 12},
-    "mir125": {"mean": 1.2, "std": 0.4}
-}
+# استخراج mean و std واقعی از scaler مدل
+num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+feature_names = preprocessor.get_feature_names_out()
+bio_features_idx = [i for i, f in enumerate(feature_names) if f in bio_features_scaled]
 
+bio_stats_real = {}
+for i, f in enumerate(bio_features_scaled):
+    bio_stats_real[f.replace("num__", "")] = {
+        "mean": num_scaler.mean_[bio_features_idx[i]],
+        "std": np.sqrt(num_scaler.var_[bio_features_idx[i]])
+    }
 
 with st.form("biomarker_form"):
     st.markdown("Enter patient biomarker values (only zero or positive numbers).")
@@ -170,7 +174,6 @@ with st.form("biomarker_form"):
     for i, biomarker in enumerate(bio_features_original):
         col = cols[i % 3]
         with col:
-            # ورودی actual کاربر
             value = st.number_input(
                 f"{biomarker} ({bio_units.get(biomarker, '')})",
                 value=0.0,
@@ -182,24 +185,25 @@ with st.form("biomarker_form"):
             user_data[biomarker] = value
 
             # بررسی مقدار ورودی کاربر با mean/std واقعی
-            mean = bio_stats[biomarker]["mean"]
-            std = bio_stats[biomarker]["std"]
+            mean = bio_stats_real[biomarker]["mean"]
+            std = bio_stats_real[biomarker]["std"]
             if value < mean - 2*std or value > mean + 2*std:
-                alerts.append(f"⚠️ {biomarker} value ({value}) is outside the normal range ({mean-2*std:.2f} - {mean+2*std:.2f}). Please insert a correct value!")
+                alerts.append(
+                    f"⚠️ {biomarker} value ({value}) is outside the normal range "
+                    f"({mean-2*std:.2f} - {mean+2*std:.2f}). Please insert a correct value!"
+                )
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
 if submitted:
-    # اگر مقادیر خارج از محدوده باشند
     if alerts:
         for alert in alerts:
             st.error(alert)
-        st.stop()  # جلوگیری از ادامه محاسبه
+        st.stop()
     else:
         st.success("All inputs within normal ranges ✅")
 
     with st.spinner("Calculating..."):
-        # تبدیل ورودی به DataFrame و ادامه محاسبات مدل
         df_bio = pd.DataFrame([user_data], columns=bio_features_original)
 
         full_input = pd.DataFrame(columns=NUM_FEATURES)
@@ -218,9 +222,7 @@ if submitted:
         df_pred_scaled = pd.DataFrame(predicted_scaled_mediators, columns=mediator_features_scaled)
 
         # تبدیل mediators به actual
-        num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
         zeros_full = np.zeros((1, len(NUM_FEATURES)))
-
         med_raw = [m.replace("num__", "") for m in mediator_features_scaled]
 
         for i, f in enumerate(NUM_FEATURES):
