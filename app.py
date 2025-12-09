@@ -1,4 +1,4 @@
-ببین این اغدادی ک به عنوان میانگین و واریانس گذاشتی مقادیر واقعی نیست اخه
+
 import streamlit_authenticator as stauth
 import yaml
 import copy
