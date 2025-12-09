@@ -285,36 +285,8 @@ Predicted mediators:
         )
 
 
-        # Download report
-        st.markdown("---")
-        report = f"""
-HFpEF Probability Report
-========================
 
 
-
-st.set_page_config(
-    page_title="HFpEF Prediction System",
-    page_icon="🏥",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
-st.set_page_config(
-    page_title="HFpEF Prediction System",
-    page_icon="🏥",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
-st.set_page_config(
-    page_title="HFpEF Prediction System",
-    page_icon="🏥",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 st.markdown("""
 <style>
