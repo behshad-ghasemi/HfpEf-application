@@ -140,7 +140,7 @@ st.header("🔬 Biomarker Information")
 bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
 
 
-# تعریف واحدها
+
 bio_units = {
     "PINK1": "ng/mL",
     "Galectin3": "ng/mL",
@@ -150,24 +150,39 @@ bio_units = {
     "mir125": "unitless"
 }
 
+bio_stats = {
+    "PINK1": {"mean": 5.2, "std": 1.3},
+    "Galectin3": {"mean": 12.5, "std": 3.2},
+    "mir-7110": {"mean": 0.8, "std": 0.2},
+    "DHEAs": {"mean": 3.5, "std": 1.1},
+    "SHBG": {"mean": 50, "std": 12},
+    "mir125": {"mean": 1.2, "std": 0.4}
+}
+
 with st.form("biomarker_form"):
     st.markdown("Enter patient biomarker values (only zero or positive numbers).")
 
     cols = st.columns(3)
     user_data = {}
+    alerts = []
 
     for i, biomarker in enumerate(bio_features_original):
         col = cols[i % 3]
         with col:
             value = st.number_input(
-                f"{biomarker} ({bio_units.get(biomarker, '')})",  # نمایش واحد
-                value=0.0,                                      # مقدار پیش‌فرض
-                min_value=0.0,                                  # فقط صفر و مثبت
+                f"{biomarker} ({bio_units.get(biomarker, '')})",
+                value=0.0,
+                min_value=0.0,
                 step=0.01,
                 format="%.2f",
                 key=f"bio_{i}"
             )
             user_data[biomarker] = value
+
+            mean = bio_stats[biomarker]["mean"]
+            std = bio_stats[biomarker]["std"]
+            if value < mean - 2*std or value > mean + 2*std:
+                alerts.append(f"⚠️ {biomarker} value ({value}) is outside normal range [{mean-2*std:.2f}, {mean+2*std:.2f}]")
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
