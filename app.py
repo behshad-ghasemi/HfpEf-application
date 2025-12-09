@@ -1,7 +1,5 @@
-
 import streamlit_authenticator as stauth
 import yaml
-import copy
 import pandas as pd
 import numpy as np
 import pickle
@@ -10,7 +8,7 @@ import requests
 import io
 import streamlit as st
 
-
+# ================== Model Loading ==================
 url = "https://raw.githubusercontent.com/behshad-ghasemi/Hfpef-application-secrets/main/inference_objects.pkl"
 headers = {"Authorization": f"Bearer {st.secrets['github']['token']}"}
 
@@ -20,9 +18,7 @@ if response.status_code != 200:
     st.error("❌ Could not download model file from private GitHub repository.")
     st.stop()
 
-
 GITHUB_TOKEN = st.secrets["github"]["token"]
-
 
 model_objects = pickle.load(io.BytesIO(response.content))
 preprocessor = model_objects['preprocessor']
@@ -33,7 +29,7 @@ mediator_features_scaled = model_objects['mediator_features_scaled']
 NUM_FEATURES = model_objects['NUM_FEATURES']
 causal_ranges = model_objects['causal_ranges']
 
-
+# ================== Page Config ==================
 st.set_page_config(
     page_title="HFpEF Prediction System",
     page_icon="🏥",
@@ -41,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-
+# ================== Authentication ==================
 secrets_url = "https://raw.githubusercontent.com/behshad-ghasemi/Hfpef-application-secrets/main/secrets.toml"
 secrets_headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
 
@@ -82,7 +78,7 @@ if st.session_state.get("authentication_status") is None:
 
 name = st.session_state["name"]
 
-
+# ================== Header ==================
 col1, col2, col3 = st.columns([1, 3, 1])
 
 with col1:
@@ -105,33 +101,26 @@ with col2:
         </div>
     """, unsafe_allow_html=True)
 
-
 with col3:
     st.write(f"👤 **{name}**")
     authenticator.logout("Logout", "main")
 
 st.markdown("---")
 
-
-
-
+# ================== Sidebar ==================
 with st.sidebar:
     st.header("📊 Model Information")
     st.metric("Stage 1 Model", model_objects['best_stage1_model_name'])
     st.metric("Stage 1 R²", f"{model_objects['best_stage1_r2']:.3f}")
     st.metric("Stage 2 Model", model_objects['best_stage2_model_name'])
     st.metric("Stage 2 AUC", f"{model_objects['best_stage2_auc']:.3f}")
-
     st.markdown("---")
     st.info("The model estimates HFpEF risk using biomarkers.")
 
-
-
+# ================== Biomarker Configuration ==================
 st.header("🔬 Biomarker Information")
 
 bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
-
-
 
 bio_units = {
     "PINK1": "ng/mL",
@@ -144,25 +133,23 @@ bio_units = {
 
 bio_stats = {
     "PINK1": {"mean": 4.147694837, "std": 5.366805867},
-    "Galectin3": {"mean": 6.642251141, "std":5.376785606},
+    "Galectin3": {"mean": 6.642251141, "std": 5.376785606},
     "mir-7110": {"mean": 87.56797769, "std": 496.8851913},
     "DHEAs": {"mean": 2049.97, "std": 2553.86406},
-    "SHBG": {"mean": 2144.46, "std":2403.79653},
+    "SHBG": {"mean": 2144.46, "std": 2403.79653},
     "mir125": {"mean": 1.861721004, "std": 2.610673131}
 }
 
-
+# ================== Input Form ==================
 with st.form("biomarker_form"):
     st.markdown("Enter patient biomarker values (only zero or positive numbers).")
 
     cols = st.columns(3)
     user_data = {}
-    alerts = []
 
     for i, biomarker in enumerate(bio_features_original):
         col = cols[i % 3]
         with col:
-            
             value = st.number_input(
                 f"{biomarker} ({bio_units.get(biomarker, '')})",
                 value=0.0,
@@ -173,34 +160,32 @@ with st.form("biomarker_form"):
             )
             user_data[biomarker] = value
 
-            
-            mean = bio_stats[biomarker]["mean"]
-            std = bio_stats[biomarker]["std"]
-            if value < mean - 2*std or value > mean + 2*std:
-                alerts.append(f"⚠️ {biomarker} value ({value}) is outside the normal range ({mean-2*std:.2f} - {mean+2*std:.2f}). Please insert a correct value!")
-
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
-
+# ================== Prediction Logic ==================
 if submitted:
-
+    # Create biomarker DataFrame
     df_bio = pd.DataFrame([user_data], columns=bio_features_original)
+    
+    # Calculate adaptive thresholds
     std_values = np.array([bio_stats[b]["std"] for b in bio_features_original])
     median_std = np.median(std_values[np.isfinite(std_values)]) if np.any(np.isfinite(std_values)) else 1.0
     if median_std <= 0:
         median_std = 1.0
 
     alerts = []
-    widened = False  
+    widened = False
 
+    # Validate each biomarker with adaptive thresholds
     for biomarker in bio_features_original:
         mean = bio_stats[biomarker]["mean"]
         std = bio_stats[biomarker]["std"]
+        
+        # Adaptive factor based on relative variability
         adaptive_factor = float(std) / float(median_std)
         if adaptive_factor < 1.0:
             adaptive_factor = 1.0
-
-        adaptive_factor = min(adaptive_factor, 5.0)
+        adaptive_factor = min(adaptive_factor, 5.0)  # Cap at 5x
 
         lower = mean - 2.0 * std * adaptive_factor
         upper = mean + 2.0 * std * adaptive_factor
@@ -212,20 +197,20 @@ if submitted:
 
         if val < lower or val > upper:
             alerts.append(
-                f"⚠️ {biomarker} value ({val}) is outside the adaptive normal range "
-                f"({lower:.2f} - {upper:.2f}). Please insert a correct value!"
+                f"⚠️ {biomarker} value ({val:.2f}) is outside the acceptable range "
+                f"({lower:.2f} - {upper:.2f}). Please verify the value!"
             )
+        
         if adaptive_factor > 1.0:
             widened = True
 
-
+    # Check for data quality issues
     vals = list(user_data.values())
-
     vals_for_uniqueness = [v if not pd.isna(v) else "__NA__" for v in vals]
+    
     if len(set(vals_for_uniqueness)) == 1:
         st.error("⚠️ All biomarker values are identical. Please enter realistic patient data.")
         st.stop()
-
 
     numeric_vals = np.array([v for v in vals if (v is not None and not pd.isna(v))], dtype=float)
     if numeric_vals.size == 0:
@@ -236,37 +221,43 @@ if submitted:
         st.error("⚠️ Biomarker values have too little variation. Please enter realistic patient data.")
         st.stop()
 
-    
+    # Display alerts if any
     if alerts:
         for alert in alerts:
             st.error(alert)
         st.stop()
 
- 
     if widened:
-        st.info("Note: population-level variability for some biomarkers is high, so the app "
-                "adapted acceptable ranges accordingly (widened confidence intervals).")
+        st.info("ℹ️ Note: Some biomarkers have high population variability, so acceptable ranges were adapted accordingly (widened confidence intervals).")
 
-    st.success("All inputs within normal ranges ✅")
+    st.success("✅ All inputs within acceptable ranges")
 
+    # ================== EXACT SAME PIPELINE AS TRAINING CODE ==================
     with st.spinner("Calculating..."):
-        # (rest of your code unchanged)
+        # Step 1: Create full input with all NUM_FEATURES
         full_input = pd.DataFrame(columns=NUM_FEATURES)
+        
         for col in NUM_FEATURES:
             if col in df_bio.columns:
                 full_input[col] = df_bio[col]
             else:
                 full_input[col] = np.nan
 
+        # Step 2: Transform using preprocessor (same as training)
         scaled = preprocessor.transform(full_input)
         df_scaled = pd.DataFrame(scaled, columns=preprocessor.get_feature_names_out())
+        
+        # Step 3: Extract biomarker features (same as training)
         bio_scaled_input = df_scaled[bio_features_scaled]
+        
+        # Fill any remaining NaN with median (same as training)
+        bio_scaled_input = bio_scaled_input.fillna(bio_scaled_input.median())
 
-        # Stage 1 prediction (mediators)
+        # Step 4: Stage 1 - Predict mediators (same as training)
         predicted_scaled_mediators = multi_reg.predict(bio_scaled_input)
         df_pred_scaled = pd.DataFrame(predicted_scaled_mediators, columns=mediator_features_scaled)
 
-        # تبدیل mediators به actual
+        # Step 5: Inverse transform mediators to actual values (same as training)
         num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
         zeros_full = np.zeros((1, len(NUM_FEATURES)))
 
@@ -285,9 +276,10 @@ if submitted:
         df_mediators_actual = pd.DataFrame([mediator_actual]).T
         df_mediators_actual.columns = ["Predicted Value"]
 
-        # Stage 2: HF probability
+        # Step 6: Stage 2 - Predict HFpEF probability (same as training)
         hf_proba = model_hf.predict_proba(df_pred_scaled.values)[0, 1]
 
+        # ================== Display Results ==================
         st.markdown("---")
         st.header("📊 Prediction Result")
 
@@ -307,34 +299,38 @@ if submitted:
         if hf_proba >= 0.5:
             st.warning("⚠️ Additional cardiology review recommended.")
         else:
-            st.success("Normal condition.")
+            st.success("✅ Normal condition - Continue regular monitoring.")
 
-        # دانلود گزارش
+        # Download report
         st.markdown("---")
         report = f"""
 HFpEF Probability Report
 =========================
 
 Date: {pd.Timestamp.now()}
+Patient: {name}
 
 Probability: {hf_proba:.1%}
 Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
 
-Biomarker input:
+Biomarker Input (Original Values):
 {df_bio.to_string()}
 
-Predicted mediators:
+Predicted Mediators (Actual Values):
 {df_mediators_actual.to_string()}
+
+Model Information:
+- Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
+- Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
 """
         st.download_button(
             "📥 Download Report",
             report,
-            file_name="HFpEF_Report.txt",
+            file_name=f"HFpEF_Report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt",
             mime="text/plain"
         )
 
-
-
+# ================== Styling ==================
 st.markdown("""
 <style>
     html, body, .stApp {
@@ -342,12 +338,10 @@ st.markdown("""
         color: #ECF0F1 !important;      
     }
 
-    /* استایل اصلی محتوا */
     .main .block-container {
-        color: #1e3a8a !important; /* متن داخل کادرها */
+        color: #1e3a8a !important;
     }
 
-    /* هدرها */
     h1 {
         color: #1e3a8a;
         font-weight: 700;
@@ -370,7 +364,6 @@ st.markdown("""
         font-size: 1.4rem !important;
     }
 
-    /* دکمه‌ها */
     .stButton>button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -390,11 +383,10 @@ st.markdown("""
         background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
     }
 
-    /* کادرهای متریک */
     [data-testid="stMetricValue"] {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #1e3a8a; /* متن متریک‌ها روی پس‌زمینه سفید */
+        color: #1e3a8a;
     }
     [data-testid="stMetricLabel"] {
         font-size: 1rem;
@@ -402,7 +394,7 @@ st.markdown("""
         color: #64748b;
     }
     .stMetric {
-        background: #FFFFFF; /* کادر متریک سفید */
+        background: #FFFFFF;
         padding: 1.5rem;
         border-radius: 15px;
         border-left: 5px solid #3b82f6;
@@ -414,15 +406,14 @@ st.markdown("""
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
     }
 
-    /* فرم ورودی */
     .stNumberInput>div>div>input {
         border-radius: 10px;
         border: 2px solid #cbd5e1;
         padding: 0.75rem;
         font-size: 1rem;
         transition: all 0.3s ease;
-        background: #FFFFFF; /* کادر فرم سفید */
-        color: #1e3a8a;      /* متن داخل فرم */
+        background: #FFFFFF;
+        color: #1e3a8a;
     }
     .stNumberInput>div>div>input:focus {
         border-color: #3b82f6;
@@ -431,18 +422,17 @@ st.markdown("""
     }
     .stNumberInput label {
         font-weight: 600;
-        color: #1e3a8a; /* متن لیبل‌ها روی کادر سفید */
+        color: #1e3a8a;
         font-size: 0.95rem;
     }
 
-    /* جدول */
     .dataframe {
         border: 2px solid #e2e8f0;
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        background: #FFFFFF; /* پس‌زمینه جدول سفید */
-        color: #1e3a8a;      /* متن جدول */
+        background: #FFFFFF;
+        color: #1e3a8a;
     }
     .dataframe thead tr th {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
@@ -463,9 +453,8 @@ st.markdown("""
         font-size: 0.95rem;
     }
 
-    /* سایدبار */
     [data-testid="stSidebar"] {
-        background: #001F3F; /* سایدبار لوکس تیره */
+        background: #001F3F;
     }
     [data-testid="stSidebar"] .stMarkdown {
         color: white;
@@ -475,7 +464,6 @@ st.markdown("""
         border-bottom-color: rgba(255, 255, 255, 0.3);
     }
 
-    /* کادرهای پیام */
     .stSuccess, .stWarning, .stError, .stInfo {
         border-radius: 12px;
         padding: 1.5rem;
@@ -484,7 +472,7 @@ st.markdown("""
     }
     .stSuccess {
         background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        border-left: 5px solid #3d2687;
+        border-left: 5px solid #10b981;
     }
     .stWarning {
         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
@@ -499,7 +487,6 @@ st.markdown("""
         border-left: 5px solid #3b82f6;
     }
 
-    /* جداکننده */
     hr {
         margin: 2rem 0;
         border: none;
@@ -507,17 +494,15 @@ st.markdown("""
         background: linear-gradient(90deg, transparent, #3b82f6, transparent);
     }
 
-    /* فرم */
     [data-testid="stForm"] {
-        background: #FFFFFF; /* فرم سفید */
+        background: #FFFFFF;
         padding: 2rem;
         border-radius: 15px;
         border: 2px solid #e2e8f0;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-        color: #1e3a8a; /* متن داخل فرم */
+        color: #1e3a8a;
     }
 
-    /* دکمه دانلود */
     .stDownloadButton>button {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
@@ -533,20 +518,17 @@ st.markdown("""
         box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
     }
 
-    /* کارت‌های نتیجه */
     div[data-testid="column"] > div {
-        background: #FFFFFF; /* کارت‌های وسط سفید */
+        background: #FFFFFF;
         border-radius: 12px;
         padding: 1rem;
         color: #1e3a8a;
     }
 
-    /* انیمیشن لودینگ */
     .stSpinner > div {
         border-top-color: #3b82f6!important;
     }
 
-    /* هدر لوگو */
     [data-testid="column"]:first-child img {
         border-radius: 15px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -558,4 +540,3 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
