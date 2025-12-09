@@ -192,6 +192,7 @@ with st.form("biomarker_form"):
 
 
 if submitted:
+    df_bio = pd.DataFrame([user_data], columns=bio_features_original)
 
     if alerts:
         for alert in alerts:
