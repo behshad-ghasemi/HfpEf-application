@@ -258,7 +258,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     html, body, .stApp {
-    background: #002147 !important;
+    background: #001F3F !important;
     color: white !important;
     }
     
@@ -394,7 +394,7 @@ st.markdown("""
     
     /* سایدبار */
     [data-testid="stSidebar"] {
-        background: #764ba2;
+        background: #2f5073;
     }
     
     [data-testid="stSidebar"] .stMarkdown {
