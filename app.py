@@ -28,9 +28,7 @@ import requests
 import io
 import streamlit as st
 
-# ------------------------------------------------------
-# 1) Read GitHub token from Streamlit secrets
-# ------------------------------------------------------
+
 GITHUB_TOKEN = st.secrets["github"]["token"]
 
 
@@ -103,8 +101,8 @@ with col1:
 
 with col2:
     st.title("🏥 HFpEF Prediction System")
-    st.markdown("**   Heart Failure with Preserved Ejection Fraction Risk Assessment**")
-    st.markdown("*     Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*")
+    st.markdown("    **Heart Failure with Preserved Ejection Fraction Risk Assessment**")
+    st.markdown("      *Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*")
 
 with col3:
     st.write(f"👤 **{name}**")
@@ -129,7 +127,7 @@ with st.sidebar:
 
 st.header("🔬 Biomarker Information")
 
-bio_features_original = [f.replace("num__", "****") for f in bio_features_scaled]
+bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
 
 with st.form("biomarker_form"):
     st.markdown("Enter patient biomarker values.")
