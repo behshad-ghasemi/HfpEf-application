@@ -168,7 +168,7 @@ with st.form("biomarker_form"):
                 value=0.0,
                 min_value=0.0,
                 step=0.01,
-                format="%.2f",
+                format="%.4f",
                 key=f"bio_{i}"
             )
             user_data[biomarker] = value
