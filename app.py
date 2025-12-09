@@ -190,12 +190,23 @@ with st.form("biomarker_form"):
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
+
 if submitted:
-   
+
     if alerts:
         for alert in alerts:
             st.error(alert)
-        st.stop()  
+        st.stop() 
+    
+    if df_bio.nunique().min() == 1:
+        st.error("⚠️ All biomarker values are identical. Please enter realistic patient data.")
+        st.stop()
+    
+    if np.std(list(user_data.values())) < 1e-3:
+        st.error("⚠️ Biomarker values have too little variation. Please enter realistic patient data.")
+        st.stop()
+
+
     else:
         st.success("All inputs within normal ranges ✅")
 
