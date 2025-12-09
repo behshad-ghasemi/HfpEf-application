@@ -182,14 +182,15 @@ with st.form("biomarker_form"):
             mean = bio_stats[biomarker]["mean"]
             std = bio_stats[biomarker]["std"]
             if value < mean - 2*std or value > mean + 2*std:
-                alerts.append(f"⚠️ {biomarker} value ({value}) is outside normal range [{mean-2*std:.2f}, {mean+2*std:.2f}]")
+                alerts.append(f"⚠️ {biomarker} value ({value}) is outside the range , Insert the correct value please!")
 
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
 if submitted:
     if alerts:
         for alert in alerts:
-            st.warning(alert)
+            st.error(alert)
+        st.stop() 
     else:
         st.success("All inputs within normal ranges ✅")
     with st.spinner("Calculating..."):
