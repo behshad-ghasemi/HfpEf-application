@@ -263,41 +263,48 @@ st.set_page_config(
 )
 
 
+st.set_page_config(
+    page_title="HFpEF Prediction System",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 st.markdown("""
 <style>
     html, body, .stApp {
-    background: #2C3E50 !important;  /* رنگ زمینه تیره لوکس */
-    color: white !important;
+        background: #2C3E50 !important; /* پس‌زمینه اصلی تیره لوکس */
+        color: #ECF0F1 !important;      /* متن روی پس‌زمینه تیره */
     }
-    
+
     /* استایل اصلی محتوا */
-    .main .block-container {color: #F8FAFC !important;} /* متن اصلی روشن */
-    
+    .main .block-container {
+        color: #1e3a8a !important; /* متن داخل کادرها */
+    }
+
     /* هدرها */
     h1 {
-        color: #D4AF37; /* طلایی لوکس */
+        color: #1e3a8a;
         font-weight: 700;
         text-align: center;
         font-size: 2.5rem !important;
         margin-bottom: 0.5rem;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
     }
-    
     h2 {
-        color: #60A5FA; /* آبی رسمی و روشن */
+        color: #2563eb;
         font-weight: 600;
         font-size: 1.8rem !important;
         margin-top: 2rem;
-        border-bottom: 3px solid #2563EB;
+        border-bottom: 3px solid #3b82f6;
         padding-bottom: 0.5rem;
     }
-    
     h3 {
-        color: #93C5FD; /* آبی روشن برای زیبا بودن */
+        color: #1e40af;
         font-weight: 600;
         font-size: 1.4rem !important;
     }
-    
+
     /* دکمه‌ها */
     .stButton>button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -317,17 +324,17 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
     }
-    
+
     /* کادرهای متریک */
     [data-testid="stMetricValue"] {
         font-size: 1.8rem;
         font-weight: 700;
-        color:black ; 
+        color: #1e3a8a; /* متن متریک‌ها روی پس‌زمینه سفید */
     }
     [data-testid="stMetricLabel"] {
         font-size: 1rem;
         font-weight: 600;
-        color: white;
+        color: #64748b;
     }
     .stMetric {
         background: #FFFFFF; /* کادر متریک سفید */
@@ -341,143 +348,150 @@ st.markdown("""
         transform: translateY(-3px);
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
     }
-    
+
     /* فرم ورودی */
     .stNumberInput>div>div>input {
         border-radius: 10px;
-        border: 2px solid #CBD5E1;
+        border: 2px solid #cbd5e1;
         padding: 0.75rem;
         font-size: 1rem;
         transition: all 0.3s ease;
-        background: white; /* روشن */
-        color: white;
+        background: #FFFFFF; /* کادر فرم سفید */
+        color: #1e3a8a;      /* متن داخل فرم */
     }
-    
     .stNumberInput>div>div>input:focus {
-        border-color: black;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         outline: none;
     }
-    
-    /* لیبل‌های ورودی */
     .stNumberInput label {
         font-weight: 600;
-        color: white; /* روشن روی زمینه تیره */
+        color: #1e3a8a; /* متن لیبل‌ها روی کادر سفید */
         font-size: 0.95rem;
     }
-    
+
     /* جدول */
     .dataframe {
-        border: 2px solid white;
+        border: 2px solid #e2e8f0;
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        background: #FFFFFF; /* پس‌زمینه جدول سفید */
+        color: #1e3a8a;      /* متن جدول */
     }
-    
     .dataframe thead tr th {
-        background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: white !important;
         font-weight: 700;
         padding: 1rem;
         font-size: 1rem;
     }
-    
     .dataframe tbody tr:nth-child(even) {
-        background-color: #1E293B;
-        color: white;
+        background-color: #f8fafc;
     }
-    
     .dataframe tbody tr:hover {
-        background-color: #1E3A5F;
+        background-color: #e0f2fe;
         transition: all 0.2s ease;
     }
-    
     .dataframe tbody td {
         padding: 0.75rem;
         font-size: 0.95rem;
-        color: white;
     }
-    
+
     /* سایدبار */
     [data-testid="stSidebar"] {
-        background: #001F3F; /* آبی رسمی تیره */
+        background: #001F3F; /* سایدبار لوکس تیره */
     }
-    
     [data-testid="stSidebar"] .stMarkdown {
         color: white;
     }
-    
     [data-testid="stSidebar"] h2 {
         color: white !important;
         border-bottom-color: rgba(255, 255, 255, 0.3);
     }
-    
+
     /* کادرهای پیام */
     .stSuccess, .stWarning, .stError, .stInfo {
         border-radius: 12px;
         padding: 1.5rem;
         font-weight: 600;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        color: #1E293B;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
-    
-    .stSuccess { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-left: 5px solid #10B981; }
-    .stWarning { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-left: 5px solid #F59E0B; }
-    .stError { background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); border-left: 5px solid #EF4444; }
-    .stInfo { background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); border-left: 5px solid #3B82F6; }
-    
+    .stSuccess {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border-left: 5px solid #10b981;
+    }
+    .stWarning {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-left: 5px solid #f59e0b;
+    }
+    .stError {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-left: 5px solid #ef4444;
+    }
+    .stInfo {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border-left: 5px solid #3b82f6;
+    }
+
     /* جداکننده */
-    hr { margin: 2rem 0; border: none; height: 2px; background: linear-gradient(90deg, transparent, #2563EB, transparent); }
-    
+    hr {
+        margin: 2rem 0;
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+    }
+
     /* فرم */
     [data-testid="stForm"] {
-        background: linear-gradient(135deg, #1E293B 0%, #1E3A5F 100%);
+        background: #FFFFFF; /* فرم سفید */
         padding: 2rem;
         border-radius: 15px;
-        border: 2px solid #2563EB;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-        color: white !important;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        color: #1e3a8a; /* متن داخل فرم */
     }
-    
+
     /* دکمه دانلود */
     .stDownloadButton>button {
-        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
         border-radius: 10px;
         padding: 0.75rem 2rem;
         font-weight: 600;
         border: none;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
-    
     .stDownloadButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
     }
-    
+
     /* کارت‌های نتیجه */
     div[data-testid="column"] > div {
-        background: #1E293B;  /* مشکی / سرمه‌ای رسمی */
+        background: #FFFFFF; /* کارت‌های وسط سفید */
         border-radius: 12px;
         padding: 1rem;
-        color: white !important;  /* متن سفید */
+        color: #1e3a8a;
     }
-    
+
     /* انیمیشن لودینگ */
-    .stSpinner > div { border-top-color: #2563EB!important; }
-    
+    .stSpinner > div {
+        border-top-color: #3b82f6!important;
+    }
+
     /* هدر لوگو */
     [data-testid="column"]:first-child img {
         border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         transition: all 0.3s ease;
     }
-    
     [data-testid="column"]:first-child img:hover {
         transform: scale(1.05);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
     }
 </style>
 """, unsafe_allow_html=True)
+
 
