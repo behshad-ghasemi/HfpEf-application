@@ -258,8 +258,8 @@ st.set_page_config(
 st.markdown("""
 <style>
     html, body, .stApp {
-    background: white !important;
-    color: black !important;
+    background: black !important;
+    color: white !important;
     }
     
     /* استایل اصلی محتوا */
