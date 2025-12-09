@@ -322,12 +322,12 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #1e3a8a; /* متن متریک‌ها روی پس‌زمینه سفید */
+        color:black ; 
     }
     [data-testid="stMetricLabel"] {
         font-size: 1rem;
         font-weight: 600;
-        color: #64748b;
+        color: white;
     }
     .stMetric {
         background: #FFFFFF; /* کادر متریک سفید */
