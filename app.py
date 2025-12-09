@@ -19,15 +19,6 @@ response = requests.get(url, headers=headers)
 if response.status_code != 200:
     st.error("❌ Could not download model file from private GitHub repository.")
     st.stop()
-import streamlit_authenticator as stauth
-import yaml
-import pandas as pd
-import numpy as np
-import pickle
-from PIL import Image
-import requests
-import io
-import streamlit as st
 
 
 GITHUB_TOKEN = st.secrets["github"]["token"]
@@ -194,21 +185,24 @@ with st.form("biomarker_form"):
 if submitted:
     df_bio = pd.DataFrame([user_data], columns=bio_features_original)
 
+
     if alerts:
         for alert in alerts:
             st.error(alert)
         st.stop() 
-    
-    if df_bio.nunique().min() == 1:
+
+
+    vals = list(user_data.values())
+    if len(set(vals)) == 1:
         st.error("⚠️ All biomarker values are identical. Please enter realistic patient data.")
         st.stop()
-    
-    if np.std(list(user_data.values())) < 1e-3:
+
+  
+    if np.std(vals) < 1e-2:  
         st.error("⚠️ Biomarker values have too little variation. Please enter realistic patient data.")
         st.stop()
-        
-    else:
-        st.success("All inputs within normal ranges ✅")
+
+    st.success("All inputs within normal ranges ✅")
 
     with st.spinner("Calculating..."):
        
