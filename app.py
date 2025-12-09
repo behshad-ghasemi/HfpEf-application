@@ -323,28 +323,24 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #D4AF37; /* طلایی */
+        color: #1e3a8a; /* متن متریک‌ها روی پس‌زمینه سفید */
     }
-    
     [data-testid="stMetricLabel"] {
         font-size: 1rem;
         font-weight: 600;
-        color: #E5E7EB; /* خاکستری روشن */
+        color: #64748b;
     }
-    
     .stMetric {
-        background: #white ;
+        background: #FFFFFF; /* کادر متریک سفید */
         padding: 1.5rem;
         border-radius: 15px;
-        border-left: 5px solid #2563EB;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        border-left: 5px solid #3b82f6;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         transition: all 0.3s ease;
-        color: black !important;  /* متن داخل متریک سفید */
     }
-    
     .stMetric:hover {
         transform: translateY(-3px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
     }
     
     /* فرم ورودی */
