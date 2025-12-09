@@ -266,7 +266,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     html, body, .stApp {
-    background: #1E293B !important;  /* رنگ زمینه تیره لوکس */
+    background: #2C3E50 !important;  /* رنگ زمینه تیره لوکس */
     color: white !important;
     }
     
@@ -333,13 +333,13 @@ st.markdown("""
     }
     
     .stMetric {
-        background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF 100%); /* تیره و رسمی */
+        background: #white ;
         padding: 1.5rem;
         border-radius: 15px;
         border-left: 5px solid #2563EB;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
-        color: white !important;  /* متن داخل متریک سفید */
+        color: black !important;  /* متن داخل متریک سفید */
     }
     
     .stMetric:hover {
