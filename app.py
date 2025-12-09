@@ -250,6 +250,7 @@ if submitted:
     st.success("All inputs within normal ranges ✅")
 
         
+        # دانلود گزارش
         st.markdown("---")
         report = f"""
 HFpEF Probability Report
@@ -272,7 +273,6 @@ Predicted mediators:
             file_name="HFpEF_Report.txt",
             mime="text/plain"
         )
-
 
 
 
