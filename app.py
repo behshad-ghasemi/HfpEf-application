@@ -258,8 +258,8 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* پس‌زمینه گرادیانت حرفه‌ای */
-    .stApp {
-        background: #1e293b;
+    html, body, .stApp, .css-18e3th9, .css-1kyxreq, .css-10trblm, .css-1cpxqw2 {
+    color: white !important;
     }
     
     /* استایل اصلی محتوا */
