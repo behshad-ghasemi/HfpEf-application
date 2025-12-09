@@ -255,38 +255,45 @@ st.set_page_config(
 )
 
 
+st.set_page_config(
+    page_title="HFpEF Prediction System",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+
 st.markdown("""
 <style>
     html, body, .stApp {
-    background: #293745 !important;
+    background: #1E293B !important;  /* رنگ زمینه تیره لوکس */
     color: white !important;
     }
     
     /* استایل اصلی محتوا */
-    .main .block-container {color: #1e293b !important;
-    }
-
+    .main .block-container {color: #F8FAFC !important;} /* متن اصلی روشن */
+    
     /* هدرها */
     h1 {
-        color: #1e3a8a;
+        color: #D4AF37; /* طلایی لوکس */
         font-weight: 700;
         text-align: center;
         font-size: 2.5rem !important;
         margin-bottom: 0.5rem;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
     }
     
     h2 {
-        color: #2563eb;
+        color: #60A5FA; /* آبی رسمی و روشن */
         font-weight: 600;
         font-size: 1.8rem !important;
         margin-top: 2rem;
-        border-bottom: 3px solid #3b82f6;
+        border-bottom: 3px solid #2563EB;
         padding-bottom: 0.5rem;
     }
     
     h3 {
-        color: #1e40af;
+        color: #93C5FD; /* آبی روشن برای زیبا بودن */
         font-weight: 600;
         font-size: 1.4rem !important;
     }
@@ -301,14 +308,14 @@ st.markdown("""
         font-size: 1.1rem;
         border: none;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.6);
         text-transform: uppercase;
         letter-spacing: 1px;
     }
     
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.8);
         background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
     }
     
@@ -316,62 +323,64 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #1e3a8a;
+        color: #D4AF37; /* طلایی */
     }
     
     [data-testid="stMetricLabel"] {
         font-size: 1rem;
         font-weight: 600;
-        color: #64748b;
+        color: #E5E7EB; /* خاکستری روشن */
     }
     
     .stMetric {
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF 100%); /* تیره و رسمی */
         padding: 1.5rem;
         border-radius: 15px;
-        border-left: 5px solid #3b82f6;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-left: 5px solid #2563EB;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         transition: all 0.3s ease;
+        color: white !important;  /* متن داخل متریک سفید */
     }
     
     .stMetric:hover {
         transform: translateY(-3px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
     }
     
     /* فرم ورودی */
     .stNumberInput>div>div>input {
         border-radius: 10px;
-        border: 2px solid #cbd5e1;
+        border: 2px solid #CBD5E1;
         padding: 0.75rem;
         font-size: 1rem;
         transition: all 0.3s ease;
-        background: white;
+        background: #F8FAFC; /* روشن */
+        color: #1E293B;
     }
     
     .stNumberInput>div>div>input:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        border-color: #2563EB;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         outline: none;
     }
     
     /* لیبل‌های ورودی */
     .stNumberInput label {
         font-weight: 600;
-        color: #1e293b;
+        color: #F8FAFC; /* روشن روی زمینه تیره */
         font-size: 0.95rem;
     }
     
     /* جدول */
     .dataframe {
-        border: 2px solid #e2e8f0;
+        border: 2px solid #E2E8F0;
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
     
     .dataframe thead tr th {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%);
         color: white !important;
         font-weight: 700;
         padding: 1rem;
@@ -379,22 +388,24 @@ st.markdown("""
     }
     
     .dataframe tbody tr:nth-child(even) {
-        background-color: #f8fafc;
+        background-color: #1E293B;
+        color: white;
     }
     
     .dataframe tbody tr:hover {
-        background-color: #e0f2fe;
+        background-color: #1E3A5F;
         transition: all 0.2s ease;
     }
     
     .dataframe tbody td {
         padding: 0.75rem;
         font-size: 0.95rem;
+        color: white;
     }
     
     /* سایدبار */
     [data-testid="stSidebar"] {
-        background: #001F3F;
+        background: #001F3F; /* آبی رسمی تیره */
     }
     
     [data-testid="stSidebar"] .stMarkdown {
@@ -411,85 +422,67 @@ st.markdown("""
         border-radius: 12px;
         padding: 1.5rem;
         font-weight: 600;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        color: #1E293B;
     }
     
-    .stSuccess {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        border-left: 5px solid #10b981;
-    }
-    
-    .stWarning {
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-        border-left: 5px solid #f59e0b;
-    }
-    
-    .stError {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-        border-left: 5px solid #ef4444;
-    }
-    
-    .stInfo {
-        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-        border-left: 5px solid #3b82f6;
-    }
+    .stSuccess { background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); border-left: 5px solid #10B981; }
+    .stWarning { background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-left: 5px solid #F59E0B; }
+    .stError { background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%); border-left: 5px solid #EF4444; }
+    .stInfo { background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); border-left: 5px solid #3B82F6; }
     
     /* جداکننده */
-    hr {
-        margin: 2rem 0;
-        border: none;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-    }
+    hr { margin: 2rem 0; border: none; height: 2px; background: linear-gradient(90deg, transparent, #2563EB, transparent); }
     
     /* فرم */
     [data-testid="stForm"] {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        background: linear-gradient(135deg, #1E293B 0%, #1E3A5F 100%);
         padding: 2rem;
         border-radius: 15px;
-        border: 2px solid #e2e8f0;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        border: 2px solid #2563EB;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        color: white !important;
     }
     
     /* دکمه دانلود */
     .stDownloadButton>button {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
         color: white;
         border-radius: 10px;
         padding: 0.75rem 2rem;
         font-weight: 600;
         border: none;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
     }
     
     .stDownloadButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6);
     }
     
     /* کارت‌های نتیجه */
     div[data-testid="column"] > div {
-        background: white;
+        background: #1E293B;  /* مشکی / سرمه‌ای رسمی */
         border-radius: 12px;
         padding: 1rem;
+        color: white !important;  /* متن سفید */
     }
     
     /* انیمیشن لودینگ */
-    .stSpinner > div {
-        border-top-color: #3b82f6!important;
-    }
+    .stSpinner > div { border-top-color: #2563EB!important; }
     
     /* هدر لوگو */
     [data-testid="column"]:first-child img {
         border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
         transition: all 0.3s ease;
     }
     
     [data-testid="column"]:first-child img:hover {
         transform: scale(1.05);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
+
