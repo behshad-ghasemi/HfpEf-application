@@ -103,8 +103,8 @@ with col1:
 
 with col2:
     st.title("🏥 HFpEF Prediction System")
-    st.markdown("**Heart Failure with Preserved Ejection Fraction Risk Assessment**")
-    st.markdown("*Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*")
+    st.markdown("**   Heart Failure with Preserved Ejection Fraction Risk Assessment**")
+    st.markdown("*     Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*")
 
 with col3:
     st.write(f"👤 **{name}**")
@@ -129,7 +129,7 @@ with st.sidebar:
 
 st.header("🔬 Biomarker Information")
 
-bio_features_original = [f.replace("num__", "") for f in bio_features_scaled]
+bio_features_original = [f.replace("num__", "****") for f in bio_features_scaled]
 
 with st.form("biomarker_form"):
     st.markdown("Enter patient biomarker values.")
@@ -419,7 +419,7 @@ st.markdown("""
     }
     .stSuccess {
         background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        border-left: 5px solid #10b981;
+        border-left: 5px solid #3d2687;
     }
     .stWarning {
         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
