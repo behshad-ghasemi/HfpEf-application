@@ -155,10 +155,10 @@ with st.form("biomarker_form"):
 if submitted:
     with st.spinner("Calculating..."):
 
-        # Create dataframe
+        
         df_bio = pd.DataFrame([user_data], columns=bio_features_original)
 
-        # Fill structure for preprocessing
+        
         full_input = pd.DataFrame(columns=NUM_FEATURES)
         for col in NUM_FEATURES:
             if col in df_bio.columns:
@@ -166,7 +166,7 @@ if submitted:
             else:
                 full_input[col] = np.nan
 
-        # Scale input
+        
         scaled = preprocessor.transform(full_input)
         df_scaled = pd.DataFrame(scaled, columns=preprocessor.get_feature_names_out())
         bio_scaled_input = df_scaled[bio_features_scaled]
