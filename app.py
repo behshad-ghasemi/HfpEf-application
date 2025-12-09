@@ -18,6 +18,21 @@ response = requests.get(url, headers=headers)
 if response.status_code != 200:
     st.error("❌ Could not download model file from private GitHub repository.")
     st.stop()
+import streamlit_authenticator as stauth
+import yaml
+import pandas as pd
+import numpy as np
+import pickle
+from PIL import Image
+import requests
+import io
+import streamlit as st
+
+# ------------------------------------------------------
+# 1) Read GitHub token from Streamlit secrets
+# ------------------------------------------------------
+GITHUB_TOKEN = st.secrets["github"]["token"]
+
 
 model_objects = pickle.load(io.BytesIO(response.content))
 preprocessor = model_objects['preprocessor']
@@ -37,7 +52,17 @@ st.set_page_config(
 )
 
 
-config = st.secrets["auth"]
+secrets_url = "https://raw.githubusercontent.com/behshad-ghasemi/Hfpef-application-secrets/main/secrets.toml"
+secrets_headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+
+secrets_response = requests.get(secrets_url, headers=secrets_headers)
+
+if secrets_response.status_code != 200:
+    st.error("❌ Could not download secrets.toml from private GitHub repository.")
+    st.stop()
+
+secrets_text = secrets_response.text
+config = yaml.safe_load(secrets_text)
 
 credentials = {
     "usernames": dict(config["credentials"]["usernames"])
