@@ -264,11 +264,6 @@ st.markdown("""
     
     /* استایل اصلی محتوا */
     .main .block-container {color: #1e293b !important;
-        padding: 2rem 3rem;
-        background: rgba(255, 255, 255, 0.95);
-        border-radius: 20px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        margin: 2rem auto;
     }
 
     /* هدرها */
