@@ -103,13 +103,13 @@ with col2:
     st.title("🏥 HFpEF Prediction System")
     st.markdown("""
         <div style='text-align: center;'>
-            **Heart Failure with Preserved Ejection Fraction Risk Assessment**
+            Heart Failure with Preserved Ejection Fraction Risk Assessment
         </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
         <div style='text-align: center; font-style: italic;'>
-            *Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)*
+            Developed by Behshad Ghaseminezhadabdolmaleki (Beth Gasemin)
         </div>
     """, unsafe_allow_html=True)
 
