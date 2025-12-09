@@ -362,13 +362,13 @@ st.markdown("""
     /* لیبل‌های ورودی */
     .stNumberInput label {
         font-weight: 600;
-        color: black; /* روشن روی زمینه تیره */
+        color: white; /* روشن روی زمینه تیره */
         font-size: 0.95rem;
     }
     
     /* جدول */
     .dataframe {
-        border: 2px solid #E2E8F0;
+        border: 2px solid white;
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
