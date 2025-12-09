@@ -152,12 +152,12 @@ bio_units = {
 }
 
 bio_stats = {
-    "PINK1": {"mean": 5.2, "std": 1.3},
-    "Galectin3": {"mean": 12.5, "std": 3.2},
-    "mir-7110": {"mean": 0.8, "std": 0.2},
-    "DHEAs": {"mean": 3.5, "std": 1.1},
-    "SHBG": {"mean": 50, "std": 12},
-    "mir125": {"mean": 1.2, "std": 0.4}
+    "PINK1": {"mean": 4.147694837, "std": 5.366805867},
+    "Galectin3": {"mean": 6.642251141, "std":5.376785606},
+    "mir-7110": {"mean": 87.56797769, "std": 496.8851913},
+    "DHEAs": {"mean": 2049.97, "std": 2553.86406},
+    "SHBG": {"mean": 2144.46, "std":2403.79653},
+    "mir125": {"mean": 1.861721004, "std": 2.610673131}
 }
 
 
@@ -171,7 +171,7 @@ with st.form("biomarker_form"):
     for i, biomarker in enumerate(bio_features_original):
         col = cols[i % 3]
         with col:
-            # ورودی actual کاربر
+            
             value = st.number_input(
                 f"{biomarker} ({bio_units.get(biomarker, '')})",
                 value=0.0,
@@ -182,7 +182,7 @@ with st.form("biomarker_form"):
             )
             user_data[biomarker] = value
 
-            # بررسی مقدار ورودی کاربر با mean/std واقعی
+            
             mean = bio_stats[biomarker]["mean"]
             std = bio_stats[biomarker]["std"]
             if value < mean - 2*std or value > mean + 2*std:
@@ -191,16 +191,16 @@ with st.form("biomarker_form"):
     submitted = st.form_submit_button("🔍 Predict HFpEF", use_container_width=True)
 
 if submitted:
-    # اگر مقادیر خارج از محدوده باشند
+   
     if alerts:
         for alert in alerts:
             st.error(alert)
-        st.stop()  # جلوگیری از ادامه محاسبه
+        st.stop()  
     else:
         st.success("All inputs within normal ranges ✅")
 
     with st.spinner("Calculating..."):
-        # تبدیل ورودی به DataFrame و ادامه محاسبات مدل
+       
         df_bio = pd.DataFrame([user_data], columns=bio_features_original)
 
         full_input = pd.DataFrame(columns=NUM_FEATURES)
