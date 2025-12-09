@@ -232,52 +232,65 @@ if submitted:
 
     st.success("✅ All inputs within acceptable ranges")
 
-    # ================== EXACT SAME PIPELINE AS TRAINING CODE ==================
+    # ================== EXACT REPLICATION OF YOUR PYTHON CODE ==================
     with st.spinner("Calculating..."):
-        # Step 1: Create full input with all NUM_FEATURES
+        # Step 1: Create DataFrame with biomarker original names
+        bio_df_input = pd.DataFrame([user_data], columns=bio_features_original)
+        
+        # Step 2: Create full_input with all NUM_FEATURES (same as your code)
         full_input = pd.DataFrame(columns=NUM_FEATURES)
         
+        # Fill biomarkers into full_input
+        for b_orig in bio_features_original:
+            if b_orig in NUM_FEATURES:
+                full_input[b_orig] = [user_data[b_orig]]
+        
+        # Fill remaining NUM_FEATURES with NaN
         for col in NUM_FEATURES:
-            if col in df_bio.columns:
-                full_input[col] = df_bio[col]
-            else:
+            if col not in full_input.columns:
                 full_input[col] = np.nan
-
-        # Step 2: Transform using preprocessor (same as training)
-        scaled = preprocessor.transform(full_input)
-        df_scaled = pd.DataFrame(scaled, columns=preprocessor.get_feature_names_out())
         
-        # Step 3: Extract biomarker features (same as training)
-        bio_scaled_input = df_scaled[bio_features_scaled]
+        # Step 3: Transform with preprocessor (FULL PIPELINE)
+        bio_scaled = preprocessor.transform(full_input)
+        bio_scaled_df = pd.DataFrame(bio_scaled, columns=preprocessor.get_feature_names_out())
         
-        # Fill any remaining NaN with median (same as training)
-        bio_scaled_input = bio_scaled_input.fillna(bio_scaled_input.median())
-
-        # Step 4: Stage 1 - Predict mediators (same as training)
-        predicted_scaled_mediators = multi_reg.predict(bio_scaled_input)
-        df_pred_scaled = pd.DataFrame(predicted_scaled_mediators, columns=mediator_features_scaled)
-
-        # Step 5: Inverse transform mediators to actual values (same as training)
+        # Step 4: Extract biomarker scaled features
+        bio_input_scaled = bio_scaled_df[bio_features_scaled]
+        
+        # Step 5: Stage 1 - Predict SCALED mediators
+        scaled_mediators = multi_reg.predict(bio_input_scaled)
+        scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled)
+        
+        # Step 6: Convert scaled mediators back to ACTUAL values
+        # THIS IS THE KEY PART - EXACT REPLICATION OF YOUR CODE
         num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
-        zeros_full = np.zeros((1, len(NUM_FEATURES)))
-
-        med_raw = [m.replace("num__", "") for m in mediator_features_scaled]
-
-        for i, f in enumerate(NUM_FEATURES):
-            if f in med_raw:
-                idx = med_raw.index(f)
-                zeros_full[0, i] = predicted_scaled_mediators[0, idx]
-
-        actual_vals = num_scaler.inverse_transform(zeros_full)
-
-        mediator_actual = {
-            f: actual_vals[0, i] for i, f in enumerate(NUM_FEATURES) if f in med_raw
-        }
-        df_mediators_actual = pd.DataFrame([mediator_actual]).T
-        df_mediators_actual.columns = ["Predicted Value"]
-
-        # Step 6: Stage 2 - Predict HFpEF probability (same as training)
-        hf_proba = model_hf.predict_proba(df_pred_scaled.values)[0, 1]
+        
+        # Create full_scaled array with zeros
+        full_scaled = np.zeros((1, len(NUM_FEATURES)))
+        
+        # Get mediator raw names (without 'num__' prefix)
+        mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
+        
+        # Fill scaled mediator values into correct positions
+        for i, feature in enumerate(NUM_FEATURES):
+            if feature in mediator_raw_names:
+                idx = mediator_raw_names.index(feature)
+                full_scaled[0, i] = scaled_mediators[0, idx]
+        
+        # Inverse transform to get actual values
+        actual_values = num_scaler.inverse_transform(full_scaled)
+        
+        # Extract mediator actual values
+        mediator_actual = {}
+        for i, feature in enumerate(NUM_FEATURES):
+            if feature in mediator_raw_names:
+                mediator_actual[feature] = actual_values[0, i]
+        
+        # Create DataFrame for display
+        actual_mediators_df = pd.DataFrame([mediator_actual])
+        
+        # Step 7: Stage 2 - Predict HFpEF using SCALED mediators (not actual!)
+        hf_proba = model_hf.predict_proba(scaled_mediators_df.values)[0, 1]
 
         # ================== Display Results ==================
         st.markdown("---")
@@ -292,8 +305,11 @@ if submitted:
             else:
                 st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
 
-        st.markdown("### 🧪 Predicted Mediator Values")
-        st.dataframe(df_mediators_actual, use_container_width=True)
+        st.markdown("### 🧪 Predicted Mediator Values (ACTUAL)")
+        # Display as vertical table like your Python code
+        display_df = actual_mediators_df.T
+        display_df.columns = ["Predicted Value"]
+        st.dataframe(display_df, use_container_width=True)
 
         st.markdown("### 💊 Recommendation")
         if hf_proba >= 0.5:
@@ -314,11 +330,15 @@ Probability: {hf_proba:.1%}
 Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
 
 Biomarker Input (Original Values):
-{df_bio.to_string()}
+{bio_df_input.to_string()}
 
-Predicted Mediators (Actual Values):
-{df_mediators_actual.to_string()}
-
+Predicted Mediators (ACTUAL VALUES):
+"""
+        for col in actual_mediators_df.columns:
+            val = actual_mediators_df[col].values[0]
+            report += f"   • {col:50s}: {val:10.2f}\n"
+        
+        report += f"""
 Model Information:
 - Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
 - Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
