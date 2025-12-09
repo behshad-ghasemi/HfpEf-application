@@ -206,8 +206,8 @@ if submitted:
     if np.std(list(user_data.values())) < 1e-3:
         st.error("⚠️ Biomarker values have too little variation. Please enter realistic patient data.")
         st.stop()
-
-    st.success("All inputs within normal ranges ✅")
+        
+    else st.success("All inputs within normal ranges ✅")
 
     with st.spinner("Calculating..."):
        
