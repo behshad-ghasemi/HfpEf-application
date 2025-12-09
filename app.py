@@ -238,79 +238,53 @@ if submitted:
 
     # ================== EXACT REPLICATION OF PYTHON CODE ==================
     with st.spinner("Calculating..."):
-        
-        # Step 1: ساخت DataFrame با تمام NUM_FEATURES و CAT_FEATURES (مثل کد پایتون)
-        X_input_all = pd.DataFrame(columns=NUM_FEATURES + CAT_FEATURES)
-        
-        # Fill biomarkers از user_data
-        for b_orig in bio_features_original:
-            if b_orig in NUM_FEATURES:
-                X_input_all.loc[0, b_orig] = user_data[b_orig]
-        
-        # Fill بقیه NUM_FEATURES با NaN
-        for col in NUM_FEATURES:
-            if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
-                X_input_all.loc[0, col] = np.nan
-        
-        # Fill CAT_FEATURES با NaN
-        for col in CAT_FEATURES:
-            X_input_all.loc[0, col] = np.nan
-        
-        # Step 2: Transform با preprocessor (دقیقاً مثل کد پایتون)
-        X_scaled = preprocessor.transform(X_input_all)
-        X_scaled_df = pd.DataFrame(X_scaled, columns=preprocessor.get_feature_names_out())
-        
-        # Step 3: استخراج bio_features_scaled (دقیقاً مثل کد پایتون)
-        X_bio_scaled = X_scaled_df[bio_features_scaled].copy()
-        
-        # Step 4: پیش‌بینی mediators (SCALED) - دقیقاً مثل کد پایتون
+    
+        # --- Step 1: ساخت DataFrame فقط با bio_features ---
+        df_bio_input = pd.DataFrame([user_data], columns=bio_features_original)
+    
+        # --- Step 2: Transform با preprocessor ---
+        bio_scaled_input = preprocessor.transform(df_bio_input)
+        bio_scaled_df = pd.DataFrame(bio_scaled_input, columns=preprocessor.get_feature_names_out())
+    
+        # --- Step 3: استخراج bio_features_scaled ---
+        X_bio_scaled = bio_scaled_df[bio_features_scaled].copy()
+    
+        # --- Step 4: پیش‌بینی mediators (SCALED) ---
         mediators_pred_scaled = multi_reg.predict(X_bio_scaled)
-        
-        # ساخت DataFrame برای scaled mediators (دقیقاً مثل کد پایتون)
-        mediators_pred_df = pd.DataFrame(
-            mediators_pred_scaled,
-            columns=mediator_features_scaled
-        )
-        
-        # Step 5: پیش‌بینی HFpEF با SCALED mediators (دقیقاً مثل کد پایتون)
+        mediators_pred_df = pd.DataFrame(mediators_pred_scaled, columns=mediator_features_scaled)
+    
+        # --- Step 5: پیش‌بینی HFpEF ---
         hf_proba = model_hf.predict_proba(mediators_pred_df.values)[0, 1]
-        
-        # ================== برای DISPLAY: محاسبه actual values ==================
-        # این فقط برای نمایش به کاربر است، نه برای پیش‌بینی!
-        
+    
+        # --- Step 6: محاسبه actual mediator values برای نمایش ---
         num_transformer = preprocessor.named_transformers_['num']
         num_scaler = num_transformer.named_steps['scaler']
-        
-        # پیدا کردن mediator names بدون prefix
+    
         mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
-        
-        # ساخت array کامل برای inverse transform
+    
         full_scaled_for_inverse = np.zeros((1, len(NUM_FEATURES)))
-        
-        # پر کردن مقادیر scaled mediators
+    
         for i, med_scaled_name in enumerate(mediator_features_scaled):
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
                 idx = NUM_FEATURES.index(med_raw_name)
                 full_scaled_for_inverse[0, idx] = mediators_pred_scaled[0, i]
-        
-        # Inverse transform برای گرفتن actual values (فقط برای display)
+    
         full_actual_values = num_scaler.inverse_transform(full_scaled_for_inverse)
-        
-        # استخراج actual mediator values
+    
         mediator_actual_dict = {}
         for med_scaled_name in mediator_features_scaled:
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
                 idx = NUM_FEATURES.index(med_raw_name)
                 mediator_actual_dict[med_raw_name] = full_actual_values[0, idx]
-        
+    
         actual_mediators_df = pd.DataFrame([mediator_actual_dict])
-
-        # ================== Display Results ==================
+    
+        # --- Step 7: Display Results ---
         st.markdown("---")
         st.header("📊 Prediction Result")
-
+    
         col1, col2, col3 = st.columns([2, 1, 2])
         with col2:
             if hf_proba >= 0.7:
@@ -319,61 +293,62 @@ if submitted:
                 st.warning(f"### 🟠 {hf_proba:.1%}\n**Medium Risk**")
             else:
                 st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
-
+    
         st.markdown("### 🧪 Predicted Mediator Values (ACTUAL)")
         display_df = actual_mediators_df.T
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
-        
-        # اضافه کردن scaled values برای debugging
+    
+        # --- Scaled values برای debugging ---
         with st.expander("🔬 Technical Details (Scaled Values Used for Prediction)"):
             scaled_display = mediators_pred_df.T
             scaled_display.columns = ["Scaled Value"]
             st.dataframe(scaled_display, use_container_width=True)
             st.caption("These are the normalized values actually used by the model for prediction.")
-
+    
         st.markdown("### 💊 Recommendation")
         if hf_proba >= 0.5:
             st.warning("⚠️ Additional cardiology review recommended.")
         else:
             st.success("✅ Normal condition - Continue regular monitoring.")
-
-        # Download report
+    
+        # --- Download report ---
         st.markdown("---")
         report = f"""
-HFpEF Probability Report
-=========================
-
-Date: {pd.Timestamp.now()}
-Patient: {name}
-
-Probability: {hf_proba:.1%}
-Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
-
-Biomarker Input (Original Values):
-{df_bio.to_string()}
-
-Predicted Mediators (ACTUAL VALUES):
-"""
+    HFpEF Probability Report
+    =========================
+    
+    Date: {pd.Timestamp.now()}
+    Patient: {name}
+    
+    Probability: {hf_proba:.1%}
+    Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
+    
+    Biomarker Input (Original Values):
+    {df_bio_input.to_string()}
+    
+    Predicted Mediators (ACTUAL VALUES):
+    """
         for col in actual_mediators_df.columns:
             val = actual_mediators_df[col].values[0]
             report += f"   • {col:50s}: {val:10.2f}\n"
-        
+    
         report += f"""
-Model Information:
-- Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
-- Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
-
-Validation Notes:
-- Adaptive thresholds were applied for biomarkers with high variability
-- Biomarkers with widened ranges: {', '.join(widened_biomarkers) if widened_biomarkers else 'None'}
-"""
+    Model Information:
+    - Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
+    - Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
+    
+    Validation Notes:
+    - Adaptive thresholds were applied for biomarkers with high variability
+    - Biomarkers with widened ranges: {', '.join(widened_biomarkers) if widened_biomarkers else 'None'}
+    """
         st.download_button(
             "📥 Download Report",
             report,
             file_name=f"HFpEF_Report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt",
             mime="text/plain"
         )
+
 
 # ================== Styling ==================
 st.markdown("""
