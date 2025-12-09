@@ -236,20 +236,32 @@ if submitted:
 
     st.success("✅ All inputs within acceptable ranges")
 
-    # ================== EXACT REPLICATION OF PYTHON CODE ==================
     with st.spinner("Calculating..."):
     
-        # --- Step 1: ساخت DataFrame فقط با bio_features ---
-        df_bio_input = pd.DataFrame([user_data], columns=bio_features_original)
+        # --- Step 1: ساخت DataFrame با تمام NUM_FEATURES و CAT_FEATURES ---
+        X_input_all = pd.DataFrame(columns=NUM_FEATURES + CAT_FEATURES)
     
-        # --- Step 2: Transform با preprocessor ---
-        bio_scaled_input = preprocessor.transform(df_bio_input)
-        bio_scaled_df = pd.DataFrame(bio_scaled_input, columns=preprocessor.get_feature_names_out())
+        # پر کردن bio_features با داده کاربر
+        for b_orig in bio_features_original:
+            if b_orig in NUM_FEATURES:
+                X_input_all.loc[0, b_orig] = user_data[b_orig]
+    
+        # پر کردن بقیه NUM_FEATURES و CAT_FEATURES با NaN
+        for col in NUM_FEATURES:
+            if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
+                X_input_all.loc[0, col] = np.nan
+        for col in CAT_FEATURES:
+            if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
+                X_input_all.loc[0, col] = np.nan
+    
+        # --- Step 2: Transform ---
+        X_scaled = preprocessor.transform(X_input_all)
+        X_scaled_df = pd.DataFrame(X_scaled, columns=preprocessor.get_feature_names_out())
     
         # --- Step 3: استخراج bio_features_scaled ---
-        X_bio_scaled = bio_scaled_df[bio_features_scaled].copy()
+        X_bio_scaled = X_scaled_df[bio_features_scaled].copy()
     
-        # --- Step 4: پیش‌بینی mediators (SCALED) ---
+        # --- Step 4: پیش‌بینی mediators ---
         mediators_pred_scaled = multi_reg.predict(X_bio_scaled)
         mediators_pred_df = pd.DataFrame(mediators_pred_scaled, columns=mediator_features_scaled)
     
@@ -263,7 +275,6 @@ if submitted:
         mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
     
         full_scaled_for_inverse = np.zeros((1, len(NUM_FEATURES)))
-    
         for i, med_scaled_name in enumerate(mediator_features_scaled):
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
@@ -281,7 +292,7 @@ if submitted:
     
         actual_mediators_df = pd.DataFrame([mediator_actual_dict])
     
-        # --- Step 7: Display Results ---
+        # --- Step 7: نمایش نتایج ---
         st.markdown("---")
         st.header("📊 Prediction Result")
     
@@ -298,6 +309,7 @@ if submitted:
         display_df = actual_mediators_df.T
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
+
     
         # --- Scaled values برای debugging ---
         with st.expander("🔬 Technical Details (Scaled Values Used for Prediction)"):
