@@ -27,6 +27,7 @@ model_hf = model_objects['model_hf']
 bio_features_scaled = model_objects['bio_features_scaled']
 mediator_features_scaled = model_objects['mediator_features_scaled']
 NUM_FEATURES = model_objects['NUM_FEATURES']
+CAT_FEATURES = model_objects['CAT_FEATURES']  # ✅ اضافه شد
 causal_ranges = model_objects['causal_ranges']
 
 # ================== Page Config ==================
@@ -167,28 +168,41 @@ if submitted:
     # Create biomarker DataFrame
     df_bio = pd.DataFrame([user_data], columns=bio_features_original)
     
-    # Calculate adaptive thresholds
+    # ✅ FIX: Adaptive thresholds با در نظر گرفتن variability
     std_values = np.array([bio_stats[b]["std"] for b in bio_features_original])
-    median_std = np.median(std_values[np.isfinite(std_values)]) if np.any(np.isfinite(std_values)) else 1.0
-    if median_std <= 0:
-        median_std = 1.0
-
+    mean_values = np.array([bio_stats[b]["mean"] for b in bio_features_original])
+    
+    # محاسبه coefficient of variation (CV) برای هر biomarker
+    cv_values = np.where(mean_values > 0, std_values / mean_values, 0)
+    median_cv = np.median(cv_values[np.isfinite(cv_values)])
+    
+    if median_cv <= 0 or not np.isfinite(median_cv):
+        median_cv = 0.5  # default fallback
+    
     alerts = []
-    widened = False
+    widened_biomarkers = []
 
     # Validate each biomarker with adaptive thresholds
     for biomarker in bio_features_original:
         mean = bio_stats[biomarker]["mean"]
         std = bio_stats[biomarker]["std"]
         
-        # Adaptive factor based on relative variability
-        adaptive_factor = float(std) / float(median_std)
-        if adaptive_factor < 1.0:
+        # محاسبه CV برای این biomarker
+        cv = std / mean if mean > 0 else 0
+        
+        # ✅ Adaptive factor: اگر variability بالاست، range را گسترش بده
+        if cv > median_cv * 1.5:  # biomarker با variability بالا
+            adaptive_factor = min(cv / median_cv, 4.0)  # حداکثر 4x
+            widened_biomarkers.append(biomarker)
+        else:
             adaptive_factor = 1.0
-        adaptive_factor = min(adaptive_factor, 5.0)  # Cap at 5x
-
-        lower = mean - 2.0 * std * adaptive_factor
-        upper = mean + 2.0 * std * adaptive_factor
+        
+        # محاسبه range با ضریب adaptive
+        lower = mean - 3.0 * std * adaptive_factor  # ✅ 3σ به جای 2σ
+        upper = mean + 3.0 * std * adaptive_factor
+        
+        # اطمینان از non-negative برای biomarkers
+        lower = max(0, lower)  # biomarkers نمی‌توانند منفی باشند
 
         val = user_data.get(biomarker, np.nan)
         if np.isnan(val):
@@ -198,11 +212,9 @@ if submitted:
         if val < lower or val > upper:
             alerts.append(
                 f"⚠️ {biomarker} value ({val:.2f}) is outside the acceptable range "
-                f"({lower:.2f} - {upper:.2f}). Please verify the value!"
+                f"({lower:.2f} - {upper:.2f}). "
+                f"{'[Widened range due to high variability]' if adaptive_factor > 1 else ''}"
             )
-        
-        if adaptive_factor > 1.0:
-            widened = True
 
     # Check for data quality issues
     vals = list(user_data.values())
@@ -227,69 +239,73 @@ if submitted:
             st.error(alert)
         st.stop()
 
-    if widened:
-        st.info("ℹ️ Note: Some biomarkers have high population variability, so acceptable ranges were adapted accordingly (widened confidence intervals).")
+    if widened_biomarkers:
+        st.info(f"ℹ️ **Adaptive Validation Applied**: The following biomarkers have high population variability (CV > {median_cv*1.5:.2f}), so their acceptable ranges were widened accordingly:\n\n" + 
+                "\n".join([f"• **{b}** (std={bio_stats[b]['std']:.1f})" for b in widened_biomarkers]))
 
     st.success("✅ All inputs within acceptable ranges")
 
-    # ================== EXACT REPLICATION OF YOUR PYTHON CODE ==================
+    # ================== FIXED PREDICTION PIPELINE ==================
     with st.spinner("Calculating..."):
-        # Step 1: Create DataFrame with biomarker original names
-        bio_df_input = pd.DataFrame([user_data], columns=bio_features_original)
+        # ✅ FIX 1: ساخت full_input با NUM_FEATURES + CAT_FEATURES (مثل کد پایتون)
+        full_input = pd.DataFrame(columns=NUM_FEATURES + CAT_FEATURES)
         
-        # Step 2: Create full_input with all NUM_FEATURES (same as your code)
-        full_input = pd.DataFrame(columns=NUM_FEATURES)
-        
-        # Fill biomarkers into full_input
+        # Fill biomarkers
         for b_orig in bio_features_original:
             if b_orig in NUM_FEATURES:
-                full_input[b_orig] = [user_data[b_orig]]
+                full_input.loc[0, b_orig] = user_data[b_orig]
         
         # Fill remaining NUM_FEATURES with NaN
         for col in NUM_FEATURES:
             if col not in full_input.columns:
                 full_input[col] = np.nan
         
-        # Step 3: Transform with preprocessor (FULL PIPELINE)
+        # Fill CAT_FEATURES with NaN (preprocessor will handle them)
+        for col in CAT_FEATURES:
+            if col not in full_input.columns:
+                full_input[col] = np.nan
+        
+        # ✅ FIX 2: Transform با full pipeline (NUM + CAT)
         bio_scaled = preprocessor.transform(full_input)
         bio_scaled_df = pd.DataFrame(bio_scaled, columns=preprocessor.get_feature_names_out())
         
-        # Step 4: Extract biomarker scaled features
+        # Extract biomarker scaled features
         bio_input_scaled = bio_scaled_df[bio_features_scaled]
         
-        # Step 5: Stage 1 - Predict SCALED mediators
+        # Stage 1 - Predict SCALED mediators
         scaled_mediators = multi_reg.predict(bio_input_scaled)
         scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled)
         
-        # Step 6: Convert scaled mediators back to ACTUAL values
-        # THIS IS THE KEY PART - EXACT REPLICATION OF YOUR CODE
-        num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+        # ✅ FIX 3: Inverse transform صحیح برای mediators
+        num_transformer = preprocessor.named_transformers_['num']
+        num_scaler = num_transformer.named_steps['scaler']
         
-        # Create full_scaled array with zeros
-        full_scaled = np.zeros((1, len(NUM_FEATURES)))
-        
-        # Get mediator raw names (without 'num__' prefix)
+        # پیدا کردن indices صحیح mediators در NUM_FEATURES
         mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
+        mediator_indices = [NUM_FEATURES.index(m) for m in mediator_raw_names if m in NUM_FEATURES]
         
-        # Fill scaled mediator values into correct positions
-        for i, feature in enumerate(NUM_FEATURES):
-            if feature in mediator_raw_names:
-                idx = mediator_raw_names.index(feature)
-                full_scaled[0, i] = scaled_mediators[0, idx]
+        # ساخت array کامل برای inverse transform
+        full_scaled_array = np.zeros((1, len(NUM_FEATURES)))
         
-        # Inverse transform to get actual values
-        actual_values = num_scaler.inverse_transform(full_scaled)
+        # پر کردن مقادیر scaled mediators در جای صحیح
+        for i, med_name in enumerate(mediator_raw_names):
+            if med_name in NUM_FEATURES:
+                idx = NUM_FEATURES.index(med_name)
+                full_scaled_array[0, idx] = scaled_mediators[0, i]
         
-        # Extract mediator actual values
+        # Inverse transform
+        full_actual_values = num_scaler.inverse_transform(full_scaled_array)
+        
+        # استخراج مقادیر actual mediators
         mediator_actual = {}
-        for i, feature in enumerate(NUM_FEATURES):
-            if feature in mediator_raw_names:
-                mediator_actual[feature] = actual_values[0, i]
+        for med_name in mediator_raw_names:
+            if med_name in NUM_FEATURES:
+                idx = NUM_FEATURES.index(med_name)
+                mediator_actual[med_name] = full_actual_values[0, idx]
         
-        # Create DataFrame for display
         actual_mediators_df = pd.DataFrame([mediator_actual])
         
-        # Step 7: Stage 2 - Predict HFpEF using SCALED mediators (not actual!)
+        # Stage 2 - Predict HFpEF using SCALED mediators
         hf_proba = model_hf.predict_proba(scaled_mediators_df.values)[0, 1]
 
         # ================== Display Results ==================
@@ -306,7 +322,6 @@ if submitted:
                 st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
 
         st.markdown("### 🧪 Predicted Mediator Values (ACTUAL)")
-        # Display as vertical table like your Python code
         display_df = actual_mediators_df.T
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
@@ -330,7 +345,7 @@ Probability: {hf_proba:.1%}
 Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
 
 Biomarker Input (Original Values):
-{bio_df_input.to_string()}
+{df_bio.to_string()}
 
 Predicted Mediators (ACTUAL VALUES):
 """
@@ -342,6 +357,10 @@ Predicted Mediators (ACTUAL VALUES):
 Model Information:
 - Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
 - Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
+
+Validation Notes:
+- Adaptive thresholds were applied for biomarkers with high variability
+- Biomarkers with widened ranges: {', '.join(widened_biomarkers) if widened_biomarkers else 'None'}
 """
         st.download_button(
             "📥 Download Report",
