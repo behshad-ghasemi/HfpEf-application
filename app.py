@@ -273,8 +273,8 @@ st.set_page_config(
 st.markdown("""
 <style>
     html, body, .stApp {
-        background: #2C3E50 !important; /* پس‌زمینه اصلی تیره لوکس */
-        color: #ECF0F1 !important;      /* متن روی پس‌زمینه تیره */
+        background: #5c687a !important; 
+        color: #ECF0F1 !important;      
     }
 
     /* استایل اصلی محتوا */
