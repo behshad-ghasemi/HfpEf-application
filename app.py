@@ -349,12 +349,12 @@ st.markdown("""
         padding: 0.75rem;
         font-size: 1rem;
         transition: all 0.3s ease;
-        background: #F8FAFC; /* روشن */
-        color: #1E293B;
+        background: white; /* روشن */
+        color: white;
     }
     
     .stNumberInput>div>div>input:focus {
-        border-color: #2563EB;
+        border-color: black;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         outline: none;
     }
@@ -362,7 +362,7 @@ st.markdown("""
     /* لیبل‌های ورودی */
     .stNumberInput label {
         font-weight: 600;
-        color: #F8FAFC; /* روشن روی زمینه تیره */
+        color: black; /* روشن روی زمینه تیره */
         font-size: 0.95rem;
     }
     
