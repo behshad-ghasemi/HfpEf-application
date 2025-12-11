@@ -165,9 +165,6 @@ with st.form("biomarker_form"):
 
 # ================== Prediction Logic ==================
 if submitted:
-    # Create biomarker DataFrame
-    df_bio = pd.DataFrame([user_data], columns=bio_features_original)
-    
     # Adaptive thresholds
     std_values = np.array([bio_stats[b]["std"] for b in bio_features_original])
     mean_values = np.array([bio_stats[b]["mean"] for b in bio_features_original])
@@ -237,64 +234,74 @@ if submitted:
     st.success("✅ All inputs within acceptable ranges")
 
     with st.spinner("Calculating..."):
-
-        # --- Step 1: ساخت DataFrame با تمام NUM_FEATURES و CAT_FEATURES ---
-        X_input_all = pd.DataFrame(columns=NUM_FEATURES + CAT_FEATURES)
-
-        # پر کردن bio_features با داده کاربر
+        # ============ CRITICAL FIX: Match Python script logic exactly ============
+        
+        # Step 1: Create full input DataFrame with ALL features (NUM + CAT)
+        full_input = pd.DataFrame(columns=NUM_FEATURES + CAT_FEATURES)
+        
+        # Fill biomarker values from user input
         for b_orig in bio_features_original:
             if b_orig in NUM_FEATURES:
-                X_input_all.loc[0, b_orig] = user_data[b_orig]
-
-        # پر کردن بقیه NUM_FEATURES و CAT_FEATURES با NaN
+                full_input.loc[0, b_orig] = user_data[b_orig]
+        
+        # Fill remaining features with NaN (mediators and other features)
         for col in NUM_FEATURES:
-            if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
-                X_input_all.loc[0, col] = np.nan
+            if col not in full_input.columns or pd.isna(full_input.loc[0, col]):
+                full_input.loc[0, col] = np.nan
+        
         for col in CAT_FEATURES:
-            if col not in X_input_all.columns or pd.isna(X_input_all.loc[0, col]):
-                X_input_all.loc[0, col] = np.nan
-
-        df_bio_input = X_input_all.copy()  # رفع NameError
-
-        # --- Step 2: Transform ---
-        X_scaled = preprocessor.transform(df_bio_input)
-        X_scaled_df = pd.DataFrame(X_scaled, columns=preprocessor.get_feature_names_out())
-
-        # --- Step 3: استخراج bio_features_scaled ---
+            if col not in full_input.columns or pd.isna(full_input.loc[0, col]):
+                full_input.loc[0, col] = np.nan
+        
+        # Step 2: Transform using preprocessor (this handles imputation with median)
+        X_scaled_all = preprocessor.transform(full_input)
+        X_scaled_df = pd.DataFrame(X_scaled_all, columns=preprocessor.get_feature_names_out())
+        
+        # Step 3: Extract ONLY biomarker features for Stage 1 prediction
         X_bio_scaled = X_scaled_df[bio_features_scaled].copy()
-
-        # --- Step 4: پیش‌بینی mediators ---
+        
+        # Step 4: Predict mediators (Stage 1) - this matches Python script
         mediators_pred_scaled = multi_reg.predict(X_bio_scaled)
         mediators_pred_df = pd.DataFrame(mediators_pred_scaled, columns=mediator_features_scaled)
-
-        # --- Step 5: پیش‌بینی HFpEF ---
+        
+        # Step 5: Predict HFpEF (Stage 2) - this matches Python script
         hf_proba = model_hf.predict_proba(mediators_pred_df.values)[0, 1]
-
-        # --- Step 6: محاسبه actual mediator values ---
+        
+        # Step 6: CORRECT inverse transformation for actual mediator values
+        # Get the scaler used in preprocessing
         num_transformer = preprocessor.named_transformers_['num']
         num_scaler = num_transformer.named_steps['scaler']
-
+        
+        # Create array with ALL NUM_FEATURES in correct order
+        # Initialize with the SCALED values that were used for preprocessing
+        full_scaled_array = X_scaled_df[[f for f in preprocessor.get_feature_names_out() 
+                                         if f.startswith('num__')]].values[0]
+        
+        # Now replace ONLY the mediator positions with predicted scaled values
         mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
-
-        full_scaled_for_inverse = np.zeros((1, len(NUM_FEATURES)))
+        
         for i, med_scaled_name in enumerate(mediator_features_scaled):
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
                 idx = NUM_FEATURES.index(med_raw_name)
-                full_scaled_for_inverse[0, idx] = mediators_pred_scaled[0, i]
-
-        full_actual_values = num_scaler.inverse_transform(full_scaled_for_inverse)
-
+                full_scaled_array[idx] = mediators_pred_scaled[0, i]
+        
+        # Inverse transform ALL features together (this is the critical fix)
+        full_actual_values = num_scaler.inverse_transform(full_scaled_array.reshape(1, -1))
+        
+        # Extract only mediator actual values
         mediator_actual_dict = {}
         for med_scaled_name in mediator_features_scaled:
             med_raw_name = med_scaled_name.replace('num__', '')
             if med_raw_name in NUM_FEATURES:
                 idx = NUM_FEATURES.index(med_raw_name)
                 mediator_actual_dict[med_raw_name] = full_actual_values[0, idx]
-
+        
         actual_mediators_df = pd.DataFrame([mediator_actual_dict])
+        
+        # ============ END OF CRITICAL FIX ============
 
-        # --- Step 7: نمایش نتایج ---
+        # Step 7: Display results
         st.markdown("---")
         st.header("📊 Prediction Result")
 
@@ -312,8 +319,14 @@ if submitted:
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
 
-        # اضافه کردن scaled values برای debugging
+        # Technical details
         with st.expander("🔬 Technical Details (Scaled Values Used for Prediction)"):
+            st.markdown("**Biomarkers (Scaled & Imputed):**")
+            bio_display = X_bio_scaled.T
+            bio_display.columns = ["Scaled Value"]
+            st.dataframe(bio_display, use_container_width=True)
+            
+            st.markdown("**Predicted Mediators (Scaled):**")
             scaled_display = mediators_pred_df.T
             scaled_display.columns = ["Scaled Value"]
             st.dataframe(scaled_display, use_container_width=True)
@@ -339,8 +352,11 @@ Probability: {hf_proba:.1%}
 Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
 
 Biomarker Input (Original Values):
-{df_bio_input[bio_features_original].to_string(index=False)}
-
+"""
+        for bio in bio_features_original:
+            report += f"   • {bio:50s}: {user_data[bio]:10.2f}\n"
+        
+        report += f"""
 Predicted Mediators (ACTUAL VALUES):
 """
         for col in actual_mediators_df.columns:
