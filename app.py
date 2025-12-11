@@ -235,78 +235,66 @@ if submitted:
     st.success("✅ All inputs within acceptable ranges")
 
     with st.spinner("Calculating..."):
-        # ============ EXACT REPLICATION OF PYTHON SCRIPT LOGIC ============
+        # ============ CORRECTED LOGIC - EXACT MATCH WITH PYTHON SCRIPT ============
         
-        # Step 1: Create DataFrame with ONLY biomarker columns matching NUM_FEATURES
+        # Step 1: Create bio_df_input with ONLY biomarker columns (matching Python script)
+        bio_df_input = pd.DataFrame([user_data], columns=bio_features_original)
+        
+        # Step 2: Create full_input with ALL NUM_FEATURES
         full_input = pd.DataFrame(columns=NUM_FEATURES)
         
-        # Fill biomarker values from user input
+        # Fill ONLY biomarker values
         for b_orig in bio_features_original:
             if b_orig in NUM_FEATURES:
-                full_input.loc[0, b_orig] = user_data[b_orig]
+                full_input[b_orig] = [user_data[b_orig]]
         
-        # Fill all other NUM_FEATURES with NaN (mediators will be imputed by preprocessor)
+        # Fill ALL other columns (mediators) with NaN
         for col in NUM_FEATURES:
-            if col not in bio_features_original:
-                full_input.loc[0, col] = np.nan
+            if col not in full_input.columns:
+                full_input[col] = np.nan
         
-        # Step 2: Transform - preprocessor will impute NaN with median
-        bio_scaled_array = preprocessor.transform(full_input)
-        bio_scaled_df = pd.DataFrame(bio_scaled_array, columns=preprocessor.get_feature_names_out())
+        # Step 3: Transform using preprocessor (this will impute NaN with median)
+        bio_scaled = preprocessor.transform(full_input)
+        bio_scaled_df = pd.DataFrame(bio_scaled, columns=preprocessor.get_feature_names_out())
         
-        # Step 3: Extract ONLY the biomarker scaled features
-        X_bio_scaled = bio_scaled_df[bio_features_scaled].copy()
+        # Step 4: Extract ONLY biomarker features for Stage 1 input
+        bio_input_scaled = bio_scaled_df[bio_features_scaled]
         
-        # Fill any remaining NaN with median of that column (matching Python script)
-        X_bio_scaled = X_bio_scaled.fillna(X_bio_scaled.median())
+        # Step 5: Stage 1 - Predict mediators (SCALED)
+        scaled_mediators = multi_reg.predict(bio_input_scaled)
+        scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled)
         
-        # Step 4: Stage 1 - Predict mediators from biomarkers
-        mediators_pred_scaled = multi_reg.predict(X_bio_scaled)
-        mediators_pred_df = pd.DataFrame(mediators_pred_scaled, columns=mediator_features_scaled)
-        
-        # Step 5: Stage 2 - Predict HFpEF from mediators
-        hf_proba = model_hf.predict_proba(mediators_pred_df.values)[0, 1]
-        
-        # Step 6: Convert mediators back to actual scale
-        # Get the numerical scaler
+        # Step 6: Convert scaled mediators to ACTUAL values (CRITICAL FIX!)
+        # Get the scaler
         num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+        
+        # Create full scaled array for inverse transform
+        full_scaled = np.zeros((1, len(NUM_FEATURES)))
         
         # Get raw mediator names
         mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
         
-        # Create a full array for inverse transform
-        # We need to create an array with the shape of NUM_FEATURES
-        full_scaled_array = np.zeros((1, len(NUM_FEATURES)))
-        
-        # Fill in the biomarker positions with their scaled values
-        for b_orig in bio_features_original:
-            if b_orig in NUM_FEATURES:
-                idx = NUM_FEATURES.index(b_orig)
-                # Get the scaled value from bio_scaled_df
-                if f'num__{b_orig}' in bio_scaled_df.columns:
-                    full_scaled_array[0, idx] = bio_scaled_df[f'num__{b_orig}'].values[0]
-        
-        # Fill in the mediator positions with predicted scaled values
-        for i, med_scaled_name in enumerate(mediator_features_scaled):
-            med_raw_name = med_scaled_name.replace('num__', '')
-            if med_raw_name in NUM_FEATURES:
-                idx = NUM_FEATURES.index(med_raw_name)
-                full_scaled_array[0, idx] = mediators_pred_scaled[0, i]
+        # Fill ONLY mediator positions with predicted scaled values
+        for i, feature in enumerate(NUM_FEATURES):
+            if feature in mediator_raw_names:
+                idx = mediator_raw_names.index(feature)
+                full_scaled[0, i] = scaled_mediators[0, idx]
         
         # Inverse transform to get actual values
-        full_actual_values = num_scaler.inverse_transform(full_scaled_array)
+        actual_values = num_scaler.inverse_transform(full_scaled)
         
         # Extract mediator actual values
-        mediator_actual_dict = {}
-        for med_scaled_name in mediator_features_scaled:
-            med_raw_name = med_scaled_name.replace('num__', '')
-            if med_raw_name in NUM_FEATURES:
-                idx = NUM_FEATURES.index(med_raw_name)
-                mediator_actual_dict[med_raw_name] = full_actual_values[0, idx]
+        mediator_actual = {}
+        for i, feature in enumerate(NUM_FEATURES):
+            if feature in mediator_raw_names:
+                mediator_actual[feature] = actual_values[0, i]
         
-        actual_mediators_df = pd.DataFrame([mediator_actual_dict])
+        actual_mediators_df = pd.DataFrame([mediator_actual])
         
-        # ============ END OF REPLICATION ============
+        # Step 7: Stage 2 - Predict HFpEF from SCALED mediators (not actual!)
+        hf_proba = model_hf.predict_proba(scaled_mediators_df.values)[0, 1]
+        
+        # ============ END OF CORRECTED LOGIC ============
 
         # Display results
         st.markdown("---")
@@ -325,7 +313,6 @@ if submitted:
         display_df = actual_mediators_df.T
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
-
 
         # Recommendation
         st.markdown("### 💊 Recommendation")
