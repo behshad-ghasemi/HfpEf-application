@@ -326,12 +326,6 @@ if submitted:
         display_df.columns = ["Predicted Value"]
         st.dataframe(display_df, use_container_width=True)
 
-        # Technical details for debugging
-        with st.expander("🔬 Technical Details (Debug Information)"):
-            st.markdown("**Input Biomarkers (Original):**")
-            input_bio_df = pd.DataFrame([user_data]).T
-            input_bio_df.columns = ["Original Value"]
-            st.dataframe(input_bio_df, use_container_width=True)
 
         # Recommendation
         st.markdown("### 💊 Recommendation")
