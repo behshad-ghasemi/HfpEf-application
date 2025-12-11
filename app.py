@@ -234,64 +234,72 @@ if submitted:
 
     st.success("✅ All inputs within acceptable ranges")
 
+    # ============ PYTHON-MATCHING PREDICTION PIPELINE ============
+    
     with st.spinner("Calculating..."):
-        # ============ CORRECTED LOGIC - EXACT MATCH WITH PYTHON SCRIPT ============
-        
-        # Step 1: Create bio_df_input with ONLY biomarker columns (matching Python script)
+    
+        # -------------------------------------------
+        # 1. Stage 1 INPUT: biomarker-only dataframe
+        # -------------------------------------------
+        # Python uses ONLY biomarkers for Stage 1
         bio_df_input = pd.DataFrame([user_data], columns=bio_features_original)
-        
-        # Step 2: Create full_input with ALL NUM_FEATURES
+    
+        # We MUST create a dataframe with all numeric features
+        # but FILL MEDIATORS WITH 0 (Python used standardized values ≈ 0 at prediction time)
         full_input = pd.DataFrame(columns=NUM_FEATURES)
-        
-        # Fill ONLY biomarker values
-        for b_orig in bio_features_original:
-            if b_orig in NUM_FEATURES:
-                full_input[b_orig] = [user_data[b_orig]]
-        
-        # Fill ALL other columns (mediators) with NaN
         for col in NUM_FEATURES:
-            if col not in full_input.columns:
-                full_input[col] = np.nan
-        
-        # Step 3: Transform using preprocessor (this will impute NaN with median)
-        bio_scaled = preprocessor.transform(full_input)
-        bio_scaled_df = pd.DataFrame(bio_scaled, columns=preprocessor.get_feature_names_out())
-        
-        # Step 4: Extract ONLY biomarker features for Stage 1 input
-        bio_input_scaled = bio_scaled_df[bio_features_scaled]
-        
-        # Step 5: Stage 1 - Predict mediators (SCALED)
-        scaled_mediators = multi_reg.predict(bio_input_scaled)
+            if col in bio_features_original:
+                full_input[col] = [user_data[col]]  # original biomarker
+            else:
+                full_input[col] = [0.0]            # mediators = zero (standard normal mean)
+    
+        # -------------------------------------------
+        # 2. Scale full numeric feature row
+        # -------------------------------------------
+        scaled_full = preprocessor.transform(full_input)
+        scaled_full_df = pd.DataFrame(scaled_full, columns=preprocessor.get_feature_names_out())
+    
+        # -------------------------------------------
+        # 3. Extract ONLY biomarker-scaled columns
+        # -------------------------------------------
+        X_stage1 = scaled_full_df[bio_features_scaled]
+    
+        # -------------------------------------------
+        # 4. Stage 1 prediction (scaled mediators)
+        # -------------------------------------------
+        scaled_mediators = multi_reg.predict(X_stage1)
         scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled)
-        
-        # Step 6: Convert scaled mediators to ACTUAL values (CRITICAL FIX!)
-        # Get the scaler
-        num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
-        
-        # Create full scaled array for inverse transform
-        full_scaled = np.zeros((1, len(NUM_FEATURES)))
-        
-        # Get raw mediator names
-        mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
-        
-        # Fill ONLY mediator positions with predicted scaled values
-        for i, feature in enumerate(NUM_FEATURES):
-            if feature in mediator_raw_names:
-                idx = mediator_raw_names.index(feature)
-                full_scaled[0, i] = scaled_mediators[0, idx]
-        
-        # Inverse transform to get actual values
-        actual_values = num_scaler.inverse_transform(full_scaled)
-        
-        # Extract mediator actual values
+    
+        # -------------------------------------------
+        # 5. Convert scaled mediators → actual mediators
+        # -------------------------------------------
+        scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+    
+        # create a dummy zero vector
+        scaled_vector = np.zeros((1, len(NUM_FEATURES)))
+    
+        # fill mediator positions ONLY
+        for m_scaled in mediator_features_scaled:
+            raw_name = m_scaled.replace("num__", "")
+            idx = NUM_FEATURES.index(raw_name)
+            value_scaled = scaled_mediators_df[m_scaled].values[0]
+            scaled_vector[0, idx] = value_scaled
+    
+        # inverse-transform
+        actual_vector = scaler.inverse_transform(scaled_vector)
+    
+        # extract mediator actual values into df
         mediator_actual = {}
-        for i, feature in enumerate(NUM_FEATURES):
-            if feature in mediator_raw_names:
-                mediator_actual[feature] = actual_values[0, i]
-        
+        for m_scaled in mediator_features_scaled:
+            raw_name = m_scaled.replace("num__", "")
+            idx = NUM_FEATURES.index(raw_name)
+            mediator_actual[raw_name] = actual_vector[0, idx]
+    
         actual_mediators_df = pd.DataFrame([mediator_actual])
-        
-        # Step 7: Stage 2 - Predict HFpEF from SCALED mediators (not actual!)
+    
+        # -------------------------------------------
+        # 6. Stage 2 prediction (USES SCALED MEDIATORS)
+        # -------------------------------------------
         hf_proba = model_hf.predict_proba(scaled_mediators_df.values)[0, 1]
         
         # ============ END OF CORRECTED LOGIC ============
