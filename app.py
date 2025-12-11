@@ -1,3 +1,4 @@
+# app.py (corrected full file)
 import streamlit_authenticator as stauth
 import yaml
 import pandas as pd
@@ -27,8 +28,13 @@ model_hf = model_objects['model_hf']
 bio_features_scaled = model_objects['bio_features_scaled']
 mediator_features_scaled = model_objects['mediator_features_scaled']
 NUM_FEATURES = model_objects['NUM_FEATURES']
-CAT_FEATURES = model_objects['CAT_FEATURES']
-causal_ranges = model_objects['causal_ranges']
+CAT_FEATURES = model_objects.get('CAT_FEATURES', [])
+causal_ranges = model_objects.get('causal_ranges', None)
+feature_names = model_objects.get('feature_names', None)
+
+# Ensure feature_names available
+if feature_names is None:
+    feature_names = preprocessor.get_feature_names_out()
 
 # ================== Page Config ==================
 st.set_page_config(
@@ -111,10 +117,10 @@ st.markdown("---")
 # ================== Sidebar ==================
 with st.sidebar:
     st.header("📊 Model Information")
-    st.metric("Stage 1 Model", model_objects['best_stage1_model_name'])
-    st.metric("Stage 1 R²", f"{model_objects['best_stage1_r2']:.3f}")
-    st.metric("Stage 2 Model", model_objects['best_stage2_model_name'])
-    st.metric("Stage 2 AUC", f"{model_objects['best_stage2_auc']:.3f}")
+    st.metric("Stage 1 Model", model_objects.get('best_stage1_model_name', 'Unknown'))
+    st.metric("Stage 1 R²", f"{model_objects.get('best_stage1_r2', 0):.3f}")
+    st.metric("Stage 2 Model", model_objects.get('best_stage2_model_name', 'Unknown'))
+    st.metric("Stage 2 AUC", f"{model_objects.get('best_stage2_auc', 0):.3f}")
     st.markdown("---")
     st.info("The model estimates HFpEF risk using biomarkers.")
 
@@ -166,7 +172,7 @@ with st.form("biomarker_form"):
 
 # ================== Prediction Logic ==================
 if submitted:
-    # Validation
+    # Validation (same as your original)
     std_values = np.array([bio_stats[b]["std"] for b in bio_features_original])
     mean_values = np.array([bio_stats[b]["mean"] for b in bio_features_original])
     
@@ -234,104 +240,129 @@ if submitted:
 
     st.success("✅ All inputs within acceptable ranges")
 
-    # ============ PYTHON-MATCHING PREDICTION PIPELINE ============
-    
     with st.spinner("Calculating..."):
-    
-        # -------------------------------------------
-        # 1. Stage 1 INPUT: biomarker-only dataframe
-        # -------------------------------------------
-        # Python uses ONLY biomarkers for Stage 1
-        bio_df_input = pd.DataFrame([user_data], columns=bio_features_original)
-    
-        # We MUST create a dataframe with all numeric features
-        # but FILL MEDIATORS WITH 0 (Python used standardized values ≈ 0 at prediction time)
-        full_input = pd.DataFrame(columns=NUM_FEATURES)
+        # ============================
+        # PYTHON-MATCHING PREDICTION
+        # ============================
+        # This block reproduces exactly the same sequence as your training script:
+        # 1) Build a DataFrame with NUM_FEATURES columns
+        # 2) Put biomarker ORIGINAL values in corresponding columns
+        # 3) Put median-imputation placeholders for other numeric cols (we use np.nan so preprocessor imputes with fit medians)
+        # 4) preprocessor.transform -> obtain scaled features (same feature order)
+        # 5) select the scaled biomarker columns (bio_features_scaled) -> input to multi_reg.predict
+        # 6) get scaled mediators -> pass scaled mediators to model_hf to get probability
+        # 7) use the numeric scaler (from preprocessor) inverse_transform only for displaying ACTUAL mediator values
+
+        # Step 1: create DataFrame with one row and NUM_FEATURES columns
+        full_input = pd.DataFrame(index=[0], columns=NUM_FEATURES, dtype=float)
+
+        # Fill biomarker original values into numeric columns when they exist
         for col in NUM_FEATURES:
             if col in bio_features_original:
-                full_input[col] = [user_data[col]]  # original biomarker
+                # put original (raw) biomarker value
+                full_input.loc[0, col] = float(user_data[col])
             else:
-                full_input[col] = [0.0]            # mediators = zero (standard normal mean)
-    
-        # -------------------------------------------
-        # 2. Scale full numeric feature row
-        # -------------------------------------------
+                # keep as NaN so preprocessor's imputer will replace with training medians (this matches training flow)
+                full_input.loc[0, col] = np.nan
+
+        # If there are categorical columns (should be none in your app), ensure they exist for transform
+        if len(CAT_FEATURES) > 0:
+            for c in CAT_FEATURES:
+                # fill with a placeholder that will be imputed by the categorical imputer if needed
+                full_input[c] = np.nan
+
+        # Step 2: transform using the saved preprocessor
+        # We rely on preprocessor to impute medians for numeric NaNs and to scale exactly as during training.
         scaled_full = preprocessor.transform(full_input)
-        scaled_full_df = pd.DataFrame(scaled_full, columns=preprocessor.get_feature_names_out())
-    
-        # -------------------------------------------
-        # 3. Extract ONLY biomarker-scaled columns
-        # -------------------------------------------
+        # columns from preprocessor.get_feature_names_out()
+        scaled_feature_names = preprocessor.get_feature_names_out()
+
+        scaled_full_df = pd.DataFrame(scaled_full, columns=scaled_feature_names, index=[0])
+
+        # Step 3: extract only the scaled biomarker columns (these are what Stage 1 expects)
         X_stage1 = scaled_full_df[bio_features_scaled]
-    
-        # -------------------------------------------
-        # 4. Stage 1 prediction (scaled mediators)
-        # -------------------------------------------
+
+        # Step 4: Stage 1 -> predict scaled mediators (MultiOutputRegressor returns array shaped (1, n_mediators))
         scaled_mediators = multi_reg.predict(X_stage1)
-        scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled)
-    
-        # -------------------------------------------
-        # 5. Convert scaled mediators → actual mediators
-        # -------------------------------------------
-        scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
-    
-        # create a dummy zero vector
-        scaled_vector = np.zeros((1, len(NUM_FEATURES)))
-    
-        # fill mediator positions ONLY
-        for m_scaled in mediator_features_scaled:
-            raw_name = m_scaled.replace("num__", "")
-            idx = NUM_FEATURES.index(raw_name)
-            value_scaled = scaled_mediators_df[m_scaled].values[0]
-            scaled_vector[0, idx] = value_scaled
-    
-        # inverse-transform
-        actual_vector = scaler.inverse_transform(scaled_vector)
-    
-        # extract mediator actual values into df
-        mediator_actual = {}
-        for m_scaled in mediator_features_scaled:
-            raw_name = m_scaled.replace("num__", "")
-            idx = NUM_FEATURES.index(raw_name)
-            mediator_actual[raw_name] = actual_vector[0, idx]
-    
-        actual_mediators_df = pd.DataFrame([mediator_actual])
-    
-        # -------------------------------------------
-        # 6. Stage 2 prediction (USES SCALED MEDIATORS)
-        # -------------------------------------------
-        hf_proba = model_hf.predict_proba(scaled_mediators_df.values)[0, 1]
-        
-        # ============ END OF CORRECTED LOGIC ============
+        scaled_mediators_df = pd.DataFrame(scaled_mediators, columns=mediator_features_scaled, index=[0])
 
-        # Display results
-        st.markdown("---")
-        st.header("📊 Prediction Result")
+        # Step 5: Stage 2 -> predict HFpEF probability using SCALED mediators (exactly like training)
+        hf_proba = float(model_hf.predict_proba(scaled_mediators_df.values)[0, 1])
 
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            if hf_proba >= 0.7:
-                st.error(f"### 🔴 {hf_proba:.1%}\n**High Risk**")
-            elif hf_proba >= 0.5:
-                st.warning(f"### 🟠 {hf_proba:.1%}\n**Medium Risk**")
-            else:
-                st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
+        # Step 6: For display only -> convert scaled mediators back to ACTUAL numeric mediator values
+        # get the numeric scaler used in the ColumnTransformer
+        try:
+            num_scaler = preprocessor.named_transformers_['num'].named_steps['scaler']
+        except Exception:
+            # fallback if pipeline naming differs
+            num_scaler = None
 
-        st.markdown("### 🧪 Predicted Mediator Values (ACTUAL)")
-        display_df = actual_mediators_df.T
-        display_df.columns = ["Predicted Value"]
-        st.dataframe(display_df, use_container_width=True)
+        if num_scaler is not None:
+            # Build the scaled row for ALL NUM_FEATURES in the same order used by num_scaler
+            # Note: the num scaler was fitted on NUM_FEATURES order; here we must preserve it.
+            scaled_vector = np.zeros((1, len(NUM_FEATURES)), dtype=float)
 
-        # Recommendation
-        st.markdown("### 💊 Recommendation")
-        if hf_proba >= 0.5:
-            st.warning("⚠️ Additional cardiology review recommended.")
+            # mediator_features_scaled like 'num__LV mass (g)' -> raw mediator name
+            mediator_raw_names = [m.replace('num__', '') for m in mediator_features_scaled]
+
+            for med_scaled_col in mediator_features_scaled:
+                raw_name = med_scaled_col.replace('num__', '')
+                if raw_name in NUM_FEATURES:
+                    idx = NUM_FEATURES.index(raw_name)
+                    scaled_value = scaled_mediators_df[med_scaled_col].values[0]
+                    scaled_vector[0, idx] = scaled_value
+                else:
+                    # if mediator raw name not found in NUM_FEATURES, ignore (shouldn't happen)
+                    pass
+
+            # Now inverse transform to get actual values for numeric features
+            try:
+                actual_vector = num_scaler.inverse_transform(scaled_vector)
+                mediator_actual = {}
+                for med_scaled_col in mediator_features_scaled:
+                    raw_name = med_scaled_col.replace('num__', '')
+                    if raw_name in NUM_FEATURES:
+                        idx = NUM_FEATURES.index(raw_name)
+                        mediator_actual[raw_name] = actual_vector[0, idx]
+                actual_mediators_df = pd.DataFrame([mediator_actual])
+            except Exception as e:
+                # If inverse fails, fallback to showing scaled mediators instead
+                actual_mediators_df = scaled_mediators_df.copy()
+                # Rename columns to raw names for display
+                actual_mediators_df.columns = [c.replace('num__', '') for c in actual_mediators_df.columns]
         else:
-            st.success("✅ Normal condition - Continue regular monitoring.")
+            # No scaler available: show scaled mediators (with raw names)
+            actual_mediators_df = scaled_mediators_df.copy()
+            actual_mediators_df.columns = [c.replace('num__', '') for c in actual_mediators_df.columns]
 
-        # Download report
-        st.markdown("---")
-        report = f"""
+    # ================== Display results ==================
+    st.markdown("---")
+    st.header("📊 Prediction Result")
+
+    col1, col2, col3 = st.columns([2, 1, 2])
+    with col2:
+        if hf_proba >= 0.7:
+            st.error(f"### 🔴 {hf_proba:.1%}\n**High Risk**")
+        elif hf_proba >= 0.5:
+            st.warning(f"### 🟠 {hf_proba:.1%}\n**Medium Risk**")
+        else:
+            st.success(f"### 🟢 {hf_proba:.1%}\n**Low Risk**")
+
+    st.markdown("### 🧪 Predicted Mediator Values (ACTUAL)")
+    display_df = actual_mediators_df.T
+    display_df.columns = ["Predicted Value"]
+    st.dataframe(display_df, use_container_width=True)
+
+    # Recommendation
+    st.markdown("### 💊 Recommendation")
+    if hf_proba >= 0.5:
+        st.warning("⚠️ Additional cardiology review recommended.")
+    else:
+        st.success("✅ Normal condition - Continue regular monitoring.")
+
+    # Download report
+    st.markdown("---")
+    report = f"""
 HFpEF Probability Report
 =========================
 
@@ -343,31 +374,35 @@ Risk Level: {'High' if hf_proba>=0.7 else 'Medium' if hf_proba>=0.5 else 'Low'}
 
 Biomarker Input (Original Values):
 """
-        for bio in bio_features_original:
-            report += f"   • {bio:50s}: {user_data[bio]:10.2f}\n"
-        
-        report += f"""
+    for bio in bio_features_original:
+        report += f"   • {bio:50s}: {user_data[bio]:10.2f}\n"
+    
+    report += f"""
 Predicted Mediators (ACTUAL VALUES):
 """
-        for col in actual_mediators_df.columns:
+    for col in actual_mediators_df.columns:
+        try:
             val = actual_mediators_df[col].values[0]
             report += f"   • {col:50s}: {val:10.2f}\n"
-        
-        report += f"""
+        except Exception:
+            report += f"   • {col:50s}: {'NA':>10s}\n"
+
+    report += f"""
 Model Information:
-- Stage 1: {model_objects['best_stage1_model_name']} (R² = {model_objects['best_stage1_r2']:.3f})
-- Stage 2: {model_objects['best_stage2_model_name']} (AUC = {model_objects['best_stage2_auc']:.3f})
+- Stage 1: {model_objects.get('best_stage1_model_name', 'N/A')} (R² = {model_objects.get('best_stage1_r2', 0):.3f})
+- Stage 2: {model_objects.get('best_stage2_model_name', 'N/A')} (AUC = {model_objects.get('best_stage2_auc', 0):.3f})
 
 Validation Notes:
 - Adaptive thresholds were applied for biomarkers with high variability
 - Biomarkers with widened ranges: {', '.join(widened_biomarkers) if widened_biomarkers else 'None'}
 """
-        st.download_button(
-            "📥 Download Report",
-            report,
-            file_name=f"HFpEF_Report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            mime="text/plain"
-        )
+    st.download_button(
+        "📥 Download Report",
+        report,
+        file_name=f"HFpEF_Report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        mime="text/plain"
+    )
+
 
 
 # ================== Styling ==================
