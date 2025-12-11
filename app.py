@@ -332,23 +332,6 @@ if submitted:
             input_bio_df = pd.DataFrame([user_data]).T
             input_bio_df.columns = ["Original Value"]
             st.dataframe(input_bio_df, use_container_width=True)
-            
-            st.markdown("**Biomarkers After Scaling:**")
-            bio_display = X_bio_scaled.T
-            bio_display.columns = ["Scaled Value"]
-            st.dataframe(bio_display, use_container_width=True)
-            
-            st.markdown("**Predicted Mediators (Scaled):**")
-            scaled_display = mediators_pred_df.T
-            scaled_display.columns = ["Scaled Value"]
-            st.dataframe(scaled_display, use_container_width=True)
-            
-            st.markdown("**Full Scaled Array for Inverse Transform:**")
-            full_array_df = pd.DataFrame([full_scaled_array[0]], columns=NUM_FEATURES).T
-            full_array_df.columns = ["Value"]
-            st.dataframe(full_array_df, use_container_width=True)
-            
-            st.caption("These are the normalized values used internally by the model.")
 
         # Recommendation
         st.markdown("### 💊 Recommendation")
