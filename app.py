@@ -352,7 +352,7 @@ if submitted:
     display_df = actual_mediators_df.T
     display_df.columns = ["Predicted Value"]
     st.dataframe(display_df, use_container_width=True)
-    st.image("recommendation.png", width=300)
+    st.image("recommendation.png", width=400)
 
     # Recommendation
     st.markdown("### 💊 Recommendation")
