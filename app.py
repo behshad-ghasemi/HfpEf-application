@@ -9,7 +9,7 @@ import requests
 import io
 import streamlit as st
 
-# ================== Model Loading ==================
+# ================== Model Loading ====================
 url = "https://raw.githubusercontent.com/behshad-ghasemi/Hfpef-application-secrets/main/inference_objects.pkl"
 headers = {"Authorization": f"Bearer {st.secrets['github']['token']}"}
 
